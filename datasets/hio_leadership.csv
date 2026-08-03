@@ -1,4 +1,4 @@
-organization,abbreviation,type,domain,scope,hq_country,founded,url,pep_url,pep_label
+organization,abbreviation,type,domain,scope,hq_country,founded,_url,url,pep_label
 Global Environment Facility,GEF,Development bank/IFI,Environment,Global,United States,1991,https://www.thegef.org,https://www.thegef.org/who-we-are/gef-council/members-alternates,Council Members
 Global Environment Facility,GEF,Development bank/IFI,Environment,Global,United States,1991,https://www.thegef.org,https://www.thegef.org/who-we-are/organization,Organization governance
 Green Climate Fund,GCF,Development bank/IFI,Environment,Global,South Korea,2010,https://www.greenclimate.fund,https://www.greenclimate.fund/boardroom,GCF Board
@@ -93,46 +93,24 @@ Missile Technology Control Regime,MTCR,Informal grouping,Arms control,Global,Fra
 Nuclear Suppliers Group,NSG,Informal grouping,Arms control,Global,Austria,1975,https://www.nuclearsuppliersgroup.org,https://www.nuclearsuppliersgroup.org/index.php/en/about/organisation,Organisation
 Nuclear Suppliers Group,NSG,Informal grouping,Arms control,Global,Austria,1975,https://www.nuclearsuppliersgroup.org,http://www.nuclearsuppliersgroup.org/index.php/en/about/chairs-corner,Chair's Corner
 Nuclear Suppliers Group,NSG,Informal grouping,Arms control,Global,Austria,1975,https://www.nuclearsuppliersgroup.org,https://www.nuclearsuppliersgroup.org/index.php/en/about/participants,Participants
-Proliferation Security Initiative,PSI,Informal grouping,Arms control,Global,?,2003,https://www.psi-online.info,https://www.psi-online.info/psi-info-en/themen/2077926-2077926,Operational Experts Group
 Wassenaar Arrangement,WA,Informal grouping,Arms control,Global,Austria,1996,https://www.wassenaar.org,https://www.wassenaar.org/about-us/,About us governance
-Zangger Committee,ZAC,Informal grouping,Arms control,Global,?,1971,https://zanggercommittee.org,https://www.zanggercommittee.org/members.html,Members
-Zangger Committee,ZAC,Informal grouping,Arms control,Global,?,1971,https://zanggercommittee.org,https://www.zanggercommittee.org/contact-us.html,Contact secretariat
 Egmont Group of Financial Intelligence Units,Egmont Group,Informal grouping,Finance & development,Global,Canada,1995,https://egmontgroup.org,https://egmontgroup.org/about/leadership/,Leadership
 Egmont Group of Financial Intelligence Units,Egmont Group,Informal grouping,Finance & development,Global,Canada,1995,https://egmontgroup.org,https://egmontgroup.org/about/organization-and-structure/,Organization and Structure
 Egmont Group of Financial Intelligence Units,Egmont Group,Informal grouping,Finance & development,Global,Canada,1995,https://egmontgroup.org,https://egmontgroup.org/en/content/egmont-group-secretariat,Secretariat
-Group of 15,G15,Informal grouping,Finance & development,Global,?,1989,?,,
 Group of 24,G24,Informal grouping,Finance & development,Global,United States,1971,https://www.g24.org,https://g24.org/about/organizational-structure-and-governance/,Structure and Governance
 Group of 24,G24,Informal grouping,Finance & development,Global,United States,1971,https://www.g24.org,https://g24.org/secretariat/,Secretariat
 Group of 24,G24,Informal grouping,Finance & development,Global,United States,1971,https://www.g24.org,https://g24.org/members/,Members
 Group of 77,G77,Informal grouping,Finance & development,Global,United States,1964,https://www.g77.org,https://www.g77.org/doc/presiding.html,Chairmanship in New York
 Group of 77,G77,Informal grouping,Finance & development,Global,United States,1964,https://www.g77.org,https://www.g77.org/doc/,Structure and chapters
-Group of Ten,G10,Informal grouping,Finance & development,Global,Switzerland,1962,?,,
-Group of Twenty,G20,Informal grouping,Finance & development,Global,?,1999,https://www.g20.org,https://g20.org/about-g20/,About and structure
-London Club,London Club,Informal grouping,Finance & development,Global,?,1976,?,,
 Paris Club,Paris Club,Informal grouping,Finance & development,Global,France,1956,https://clubdeparis.org,https://clubdeparis.org/en/communications/page/the-chair-and-the-secretariat-of-the-paris-club,Chair and Secretariat
 Paris Club,Paris Club,Informal grouping,Finance & development,Global,France,1956,https://clubdeparis.org,https://clubdeparis.org/en/communications/page/who-are-the-members-of-the-paris-club,Members
 ASEAN Plus Three,APT+3,Informal grouping,General,Regional,Indonesia,1997,https://asean.org,https://aseanplusthree.asean.org/about-apt/,About APT mechanisms
 ASEAN Plus Three,APT+3,Informal grouping,General,Regional,Indonesia,1997,https://asean.org,https://asean.org/what-we-do/secretary-general-of-asean/,Secretary-General of ASEAN
-Bilderberg Meeting,Bilderberg,Informal grouping,General,Global,?,1954,https://www.bilderbergmeetings.org,https://www.bilderbergmeetings.org/background/steering-committee/steering-committee,Steering Committee
-Bilderberg Meeting,Bilderberg,Informal grouping,General,Global,?,1954,https://www.bilderbergmeetings.org,https://www.bilderbergmeetings.org/background/governance-and-funding,Governance and funding
-BRICS,BRICS,Informal grouping,General,Global,?,2009,?,,
 East Asia Summit,EAS,Informal grouping,General,Regional,Indonesia,2005,https://asean.org,https://eastasiasummit.asean.org/about-east-asia-summit,About the EAS
 East Asia Summit,EAS,Informal grouping,General,Regional,Indonesia,2005,https://asean.org,https://eastasiasummit.asean.org/eas-participating-country,Participating countries
-Group of Eight,G8,Informal grouping,General,Global,?,1997,?,,
-Group of Seven,G7,Informal grouping,General,Global,?,1975,?,,
-Non-Aligned Movement,NAM,Informal grouping,General,Global,?,1961,?,,
-Visegrad Group,V4,Informal grouping,General,Sub-regional,?,1991,https://www.visegradgroup.eu,https://www.visegradgroup.eu/home/v4-presidency,V4 Presidency
 Open Government Partnership,OGP,Informal grouping,Justice & law,Global,United States,2011,https://www.opengovpartnership.org,https://www.opengovpartnership.org/about/who-we-are/steering-committee/sc-composition/,Steering Committee composition
 Open Government Partnership,OGP,Informal grouping,Justice & law,Global,United States,2011,https://www.opengovpartnership.org,https://www.opengovpartnership.org/about/who-we-are/board-of-directors/,Board of Directors
 ASEAN Regional Forum,ARF,Informal grouping,Security & defense,Regional,Indonesia,1994,https://aseanregionalforum.asean.org,https://aseanregionalforum.asean.org/about-arf/,About / governance
-AUKUS,AUKUS,Informal grouping,Security & defense,Regional,?,2021,?,,
-Five Eyes,FVEY,Informal grouping,Security & defense,Global,?,1946,?,,
-Quadrilateral Security Dialogue,Quad,Informal grouping,Security & defense,Regional,?,2007,?,,
-"Bangladesh, Bhutan, India, Nepal Initiative",BBIN,Informal grouping,Trade & economy,Sub-regional,India,2015,?,,
-International Competition Network,ICN,Informal grouping,Trade & economy,Global,?,2001,https://www.internationalcompetitionnetwork.org,https://www.internationalcompetitionnetwork.org/working-groups/icn-operations/steering-group/steering-group-members/,Steering Group members
-International Competition Network,ICN,Informal grouping,Trade & economy,Global,?,2001,https://www.internationalcompetitionnetwork.org,https://www.internationalcompetitionnetwork.org/working-groups/icn-operations/steering-group/,Steering Group
-Kimberley Process Certification Scheme,KPCS,Informal grouping,Trade & economy,Global,?,2003,https://www.kimberleyprocess.com,https://www.kimberleyprocess.com/about/kp-governance,Governance
-Kimberley Process Certification Scheme,KPCS,Informal grouping,Trade & economy,Global,?,2003,https://www.kimberleyprocess.com,https://www.kimberleyprocess.com/about/kp-secretariat,Secretariat
 International Centre for Settlement of Investment Disputes,ICSID,Judicial/tribunal,Finance & development,Global,United States,1966,https://icsid.worldbank.org,https://icsid.worldbank.org/about/secretariat,Secretariat
 International Centre for Settlement of Investment Disputes,ICSID,Judicial/tribunal,Finance & development,Global,United States,1966,https://icsid.worldbank.org,https://icsid.worldbank.org/about/member-states/administrative-council,Administrative Council
 African Court on Human and Peoples' Rights,AfCHPR,Judicial/tribunal,Justice & law,Regional,Tanzania,2006,https://www.african-court.org,https://www.african-court.org/wpafc/current-judges/,Current Judges
@@ -150,7 +128,6 @@ European Court of Human Rights,ECtHR,Judicial/tribunal,Justice & law,Regional,Fr
 Extraordinary Chambers in the Courts of Cambodia,ECCC,Judicial/tribunal,Justice & law,Regional,Cambodia,2006,https://www.eccc.gov.kh,https://www.eccc.gov.kh/en/organisation/chambers,Chambers judges
 Extraordinary Chambers in the Courts of Cambodia,ECCC,Judicial/tribunal,Justice & law,Regional,Cambodia,2006,https://www.eccc.gov.kh,https://www.eccc.gov.kh/en/organisation/office-of-co-investigating-judges,Co-Investigating Judges
 Extraordinary Chambers in the Courts of Cambodia,ECCC,Judicial/tribunal,Justice & law,Regional,Cambodia,2006,https://www.eccc.gov.kh,https://www.eccc.gov.kh/en/organisation/administration/court-management,Court Management
-Inter-American Court of Human Rights,IACtHR,Judicial/tribunal,Justice & law,Regional,Costa Rica,1979,https://www.corteidh.or.cr,https://www.corteidh.or.cr/composicion.cfm?lang=en,Meet the Judges
 International Court of Justice,ICJ,Judicial/tribunal,Justice & law,Global,Netherlands,1945,https://www.icj-cij.org,https://www.icj-cij.org/current-members,Current Members
 International Court of Justice,ICJ,Judicial/tribunal,Justice & law,Global,Netherlands,1945,https://www.icj-cij.org,https://www.icj-cij.org/members,Members of Court
 International Criminal Court,ICC,Judicial/tribunal,Justice & law,Global,Netherlands,2002,https://www.icc-cpi.int,https://www.icc-cpi.int/about/presidency,The Presidency
@@ -165,17 +142,12 @@ Residual Special Court for Sierra Leone,RSCSL,Judicial/tribunal,Justice & law,Gl
 Residual Special Court for Sierra Leone,RSCSL,Judicial/tribunal,Justice & law,Global,Sierra Leone,2013,https://www.rscsl.org,https://rscsl.org/the-scsl/the-office-of-the-registrar/,Office of Registrar
 Special Tribunal for Lebanon,STL,Judicial/tribunal,Justice & law,Global,Netherlands,2009,https://www.stl-tsl.org,https://www.stl-tsl.org/en/about-the-stl/biographies/judges-of-the-special-tribunal-for-lebanon,Judges biographies
 Special Tribunal for Lebanon,STL,Judicial/tribunal,Justice & law,Global,Netherlands,2009,https://www.stl-tsl.org,https://www.stl-tsl.org/en/about-the-stl/structure-of-the-stl/the-office-of-the-prosecutor,Office of Prosecutor
-"Australia, New Zealand, United States Security Treaty",ANZUS,Military alliance,Security & defense,Regional,?,1951,?,,
 Collective Security Treaty Organization,CSTO,Military alliance,Security & defense,Regional,Russia,2002,https://en.odkb-csto.org,https://en.odkb-csto.org/secretary_general/,Secretary General
 Collective Security Treaty Organization,CSTO,Military alliance,Security & defense,Regional,Russia,2002,https://en.odkb-csto.org,https://en.odkb-csto.org/structure/,CSTO Structure
 Collective Security Treaty Organization,CSTO,Military alliance,Security & defense,Regional,Russia,2002,https://en.odkb-csto.org,https://en.odkb-csto.org/authorized_organs/secretariat/,CSTO Secretariat
 Combined Maritime Forces,CMF,Military alliance,Security & defense,Global,Bahrain,2002,https://combinedmaritimeforces.com,https://combinedmaritimeforces.com/cmf-leadership/,CMF Leadership
-Five Power Defence Arrangements,FPDA,Military alliance,Security & defense,Regional,?,1971,https://www.fivepowerdefencearrangements.org,https://www.fivepowerdefencearrangements.org/governance,FPDA Governance
-Five Power Defence Arrangements,FPDA,Military alliance,Security & defense,Regional,?,1971,https://www.fivepowerdefencearrangements.org,https://www.fivepowerdefencearrangements.org/commander-iads,Commander IADS
-Five Power Defence Arrangements,FPDA,Military alliance,Security & defense,Regional,?,1971,https://www.fivepowerdefencearrangements.org,https://www.fivepowerdefencearrangements.org/chief-of-staff-1,Chief of Staff
 Inter-American Defense Board,IADB,Military alliance,Security & defense,Regional,United States,1942,https://www.jid.org,https://jid.org/en/director-general-2/,Director General
 Inter-American Defense Board,IADB,Military alliance,Security & defense,Regional,United States,1942,https://www.jid.org,https://jid.org/en/presidente-2/,Chairman (President)
-Inter-American Defense Board,IADB,Military alliance,Security & defense,Regional,United States,1942,https://www.jid.org,https://www.jid.org/en/vice-chairman/?lang=en,Vice Chairman
 Islamic Military Counter Terrorism Coalition,IMCTC,Military alliance,Security & defense,Regional,Saudi Arabia,2015,https://www.imctc.org,https://www.imctc.org/en/AboutUs/theMilitaryCommander/Pages/default.aspx,Military Commander
 NATO Parliamentary Assembly,NATO PA,Military alliance,Security & defense,Regional,Belgium,1955,https://www.nato-pa.int,https://www.nato-pa.int/content/assembly-structure,Assembly Structure
 NATO Parliamentary Assembly,NATO PA,Military alliance,Security & defense,Regional,Belgium,1955,https://www.nato-pa.int,https://www.nato-pa.int/content/secretary-general-1,Secretary General
@@ -279,8 +251,6 @@ World Federation of Trade Unions,WFTU,Professional/NGO association,Labour,Global
 Committee on Data of the International Science Council,CODATA,Professional/NGO association,Science & culture,Global,France,1966,https://codata.org,https://codata.org/about-codata/executive-committee/,Officers and Executive Committee
 International Astronomical Union,IAU,Professional/NGO association,Science & culture,Global,France,1919,https://www.iau.org,https://www.iau.org/IAU/Iau/Communities/Executive-Committee-Officers.aspx,Executive Committee Officers
 International Astronomical Union,IAU,Professional/NGO association,Science & culture,Global,France,1919,https://www.iau.org,https://www.iau.org/Iau/Iau/About/Governance-Overview/Executive-Committee.aspx,Executive Committee
-International Geographical Union,IGU,Professional/NGO association,Science & culture,Global,?,1922,https://igu-online.org,https://igu-online.org/organization/executive-committee-2024-2026/,Executive Committee 2024-2026
-International Geographical Union,IGU,Professional/NGO association,Science & culture,Global,?,1922,https://igu-online.org,https://igu-online.org/governance/,Governance
 International Mathematical Union,IMU,Professional/NGO association,Science & culture,Global,Germany,1920,https://www.mathunion.org,https://www.mathunion.org/organization/imu-executive-committee,IMU Executive Committee
 International Mathematical Union,IMU,Professional/NGO association,Science & culture,Global,Germany,1920,https://www.mathunion.org,https://www.mathunion.org/organization/imu-leadership-2023-2026,IMU Leadership 2023-2026
 International Science Council,ISC,Professional/NGO association,Science & culture,Global,France,2018,https://council.science,https://council.science/about-us/governance/governing-board/,Governing Board
@@ -324,7 +294,6 @@ International Tin Association,ITA,Professional/NGO association,Trade & economy,G
 Arab Air Carriers' Organization,AACO,Professional/NGO association,Transport,Regional,Lebanon,1965,https://www.aaco.org,https://www.aaco.org/about-us/governance,Governance
 Bureau International des Containers et du Transport Intermodal,BIC,Professional/NGO association,Transport,Global,France,1933,https://www.bic-code.org,https://www.bic-code.org/board/,Board of Directors
 Asian Football Confederation,AFC,Sport federation,Sport,Regional,Malaysia,1954,https://www.the-afc.com,https://www.the-afc.com/en/about_afc/committees/executive_committee.html,Executive Committee
-Association of International Olympic Winter Sports Federations,AIOWF,Sport federation,Sport,Global,Switzerland,1976,?,,
 Association of National Olympic Committees,ANOC,Sport federation,Sport,Global,Switzerland,1979,https://www.anocolympic.org,https://www.anocolympic.org/executive-council/,Executive Council
 Association of National Olympic Committees,ANOC,Sport federation,Sport,Global,Switzerland,1979,https://www.anocolympic.org,https://www.anocolympic.org/structure/,Structure
 Association of National Olympic Committees of Africa,ANOCA,Sport federation,Sport,Regional,Nigeria,1981,https://africaolympic.com,https://africaolympic.com/en/about-anoca/executive-committee/,Executive Committee
@@ -359,7 +328,6 @@ Fédération Internationale de Motocyclisme,FIM,Sport federation,Sport,Global,Sw
 Fédération Internationale de Volleyball,FIVB,Sport federation,Sport,Global,Switzerland,1947,https://www.fivb.com,https://www.fivb.com/inside-fivb/fivb/structure/board-of-administration/,Board of Administration
 Fédération Internationale de Volleyball,FIVB,Sport federation,Sport,Global,Switzerland,1947,https://www.fivb.com,https://www.fivb.com/inside-fivb/fivb/structure/executive-committee/,Executive Committee
 Fédération Internationale de Volleyball,FIVB,Sport federation,Sport,Global,Switzerland,1947,https://www.fivb.com,https://www.fivb.com/inside-fivb/fivb/structure/,Structure
-Global Association of International Sports Federations,GAISF,Sport federation,Sport,Global,Switzerland,1967,?,,
 International Basketball Federation,FIBA,Sport federation,Sport,Global,Switzerland,1932,https://www.fiba.basketball,https://about.fiba.basketball/en/organization/structure/central-board,Central Board
 International Basketball Federation,FIBA,Sport federation,Sport,Global,Switzerland,1932,https://www.fiba.basketball,https://about.fiba.basketball/en/organization/structure/executive-committee,Executive Committee
 International Basketball Federation,FIBA,Sport federation,Sport,Global,Switzerland,1932,https://www.fiba.basketball,https://about.fiba.basketball/en/organization/structure/our-governance,Governance
@@ -423,13 +391,9 @@ World Curling,WCF,Sport federation,Sport,Global,United Kingdom,1966,https://worl
 World Curling,WCF,Sport federation,Sport,Global,United Kingdom,1966,https://worldcurling.org,https://worldcurling.org/governance/,Governance
 World Rowing Federation,FISA,Sport federation,Sport,Global,Switzerland,1892,https://worldrowing.com,https://www.worldrowing.com/about/organisation/governance/council/,Council
 World Rowing Federation,FISA,Sport federation,Sport,Global,Switzerland,1892,https://worldrowing.com,https://www.worldrowing.com/about/organisation/,Organisation
-World Rugby,World Rugby,Sport federation,Sport,Global,Ireland,1886,https://www.world.rugby,https://www.world.rugby/organisation/governance/structure/executive-board?lang=en,Executive Committee
-World Rugby,World Rugby,Sport federation,Sport,Global,Ireland,1886,https://www.world.rugby,https://www.world.rugby/organisation/governance/structure/council?lang=en,Council
-World Rugby,World Rugby,Sport federation,Sport,Global,Ireland,1886,https://www.world.rugby,https://www.world.rugby/organisation/about-us/governance?lang=en,Governance
 World Sailing,World Sailing,Sport federation,Sport,Global,United Kingdom,1907,https://www.sailing.org,https://www.sailing.org/inside-world-sailing/organisation/governance/organisational-structure/,Organisational Structure
 World Sailing,World Sailing,Sport federation,Sport,Global,United Kingdom,1907,https://www.sailing.org,https://www.sailing.org/inside-world-sailing/organisation/governance/commissions-committees-womens-forum/world-sailing-council/,Council
 World Taekwondo,WT,Sport federation,Sport,Global,South Korea,1973,https://www.worldtaekwondo.org,http://www.worldtaekwondo.org/about-wt/council_more17.html,Council
-World Taekwondo,WT,Sport federation,Sport,Global,South Korea,1973,https://www.worldtaekwondo.org,https://m.worldtaekwondo.org/about-wt/committees.html?pm=01,Commissions and Committees
 World Triathlon,WT,Sport federation,Sport,Global,Switzerland,1989,https://triathlon.org,https://triathlon.org/about/executive-board,Executive Board
 World Triathlon,WT,Sport federation,Sport,Global,Switzerland,1989,https://triathlon.org,https://triathlon.org/governance,Governance
 Action Group against Money Laundering in Central Africa,GABAC,Standards body,Finance & development,Regional,Gabon,2000,https://spgabac.org,,
@@ -456,9 +420,6 @@ Inter-Governmental Action Group against Money Laundering in West Africa,GIABA,St
 International Association of Insurance Supervisors,IAIS,Standards body,Finance & development,Global,Switzerland,1994,https://www.iais.org,https://www.iais.org/about-the-iais/iais-leadership/,Leadership
 International Association of Insurance Supervisors,IAIS,Standards body,Finance & development,Global,Switzerland,1994,https://www.iais.org,https://www.iais.org/about-the-iais/organisational-structure/,Organisational structure
 International Association of Insurance Supervisors,IAIS,Standards body,Finance & development,Global,Switzerland,1994,https://www.iais.org,https://www.iais.org/about-the-iais/iais-secretariat/,Secretariat
-International Organization of Securities Commissions,IOSCO,Standards body,Finance & development,Global,Spain,1983,https://www.iosco.org,https://www.iosco.org/v2/about/?subsection=our-leadership,Our leadership
-International Organization of Securities Commissions,IOSCO,Standards body,Finance & development,Global,Spain,1983,https://www.iosco.org,https://www.iosco.org/v2/about/?subsection=display_committee&cmtid=11,IOSCO Board
-International Organization of Securities Commissions,IOSCO,Standards body,Finance & development,Global,Spain,1983,https://www.iosco.org,https://www.iosco.org/v2/about/?subsection=gs,General Secretariat
 Middle East and North Africa Financial Action Task Force,MENAFATF,Standards body,Finance & development,Regional,Bahrain,2004,http://www.menafatf.org,https://www.menafatf.org/about/presidency,Presidency
 Middle East and North Africa Financial Action Task Force,MENAFATF,Standards body,Finance & development,Regional,Bahrain,2004,http://www.menafatf.org,https://www.menafatf.org/about/secretariat,Secretariat
 Society for Worldwide Interbank Financial Telecommunication,SWIFT,Standards body,Finance & development,Global,Belgium,1973,https://www.swift.com,https://www.swift.com/about-us/organisation-governance/swift-board-directors,Board of Directors
@@ -594,8 +555,6 @@ European University Institute,EUI,Treaty IGO,Education & culture,Regional,Italy,
 Organization of Ibero-American States,OEI,Treaty IGO,Education & culture,Regional,Spain,1949,https://www.oei.int,https://oei.int/secretario-general/,Secretary General
 Organization of Ibero-American States,OEI,Treaty IGO,Education & culture,Regional,Spain,1949,https://www.oei.int,https://oei.int/equipo/,Team / Management
 Organization of Ibero-American States,OEI,Treaty IGO,Education & culture,Regional,Spain,1949,https://www.oei.int,https://oei.int/oficinas/secretaria-general/,General Secretariat
-Arab Atomic Energy Agency,AAEA,Treaty IGO,Energy,Regional,Tunisia,1988,https://www.aaea.org.tn,http://www.aaea.org.tn/?page_id=905,Executive Council members
-Arab Atomic Energy Agency,AAEA,Treaty IGO,Energy,Regional,Tunisia,1988,https://www.aaea.org.tn,http://www.aaea.org.tn/?page_id=898,General Conference members
 Energy Charter Secretariat,ECT,Treaty IGO,Energy,Global,Belgium,1994,https://www.energycharter.org,https://www.energycharter.org/who-we-are/secretariat/staff/office-of-the-secretary-general-deputy-secretary-general/,Office of Secretary-General
 Energy Charter Secretariat,ECT,Treaty IGO,Energy,Global,Belgium,1994,https://www.energycharter.org,https://www.energycharter.org/who-we-are/secretariat/staff/,Secretariat staff
 Energy Community,EnC,Treaty IGO,Energy,Regional,Austria,2006,https://www.energy-community.org,https://www.energy-community.org/secretariat/organisation.html,Secretariat organisation
@@ -610,7 +569,6 @@ International Energy Forum,IEF,Treaty IGO,Energy,Global,Saudi Arabia,1991,https:
 International Renewable Energy Agency,IRENA,Treaty IGO,Energy,Global,United Arab Emirates,2009,https://www.irena.org,https://www.irena.org/About/Senior-Management,Senior Management
 International Renewable Energy Agency,IRENA,Treaty IGO,Energy,Global,United Arab Emirates,2009,https://www.irena.org,https://www.irena.org/About/Institutional-Structure/Council,Council
 International Renewable Energy Agency,IRENA,Treaty IGO,Energy,Global,United Arab Emirates,2009,https://www.irena.org,https://www.irena.org/Director-General,Director General
-Latin American Energy Organization,OLADE,Treaty IGO,Energy,Regional,Ecuador,1973,https://www.olade.org,http://extranet.olade.org/institucional/executive-secretary/sobre-el-secretario-ejecutivo/?lang=en,Executive Secretary
 Latin American Energy Organization,OLADE,Treaty IGO,Energy,Regional,Ecuador,1973,https://www.olade.org,https://www.olade.org/en/olade-about/,About / structure
 Organization of Arab Petroleum Exporting Countries,OAPEC,Treaty IGO,Energy,Regional,Kuwait,1968,https://oapecorg.org,https://www.oapecorg.org/Home/About-Us/Organizational-Structure/Council-of-Ministers/General-Secretariat,General Secretariat
 Organization of Arab Petroleum Exporting Countries,OAPEC,Treaty IGO,Energy,Regional,Kuwait,1968,https://oapecorg.org,https://www.oapecorg.org/Home/About-Us/Organizational-Structure/Council-of-Ministers,Council of Ministers
@@ -722,11 +680,9 @@ Central European Initiative,CEI,Treaty IGO,General,Sub-regional,Italy,1989,https
 Central European Initiative,CEI,Treaty IGO,General,Sub-regional,Italy,1989,https://www.cei.int,https://www.cei.int/SecretaryGeneral,Secretary General
 Commonwealth of Independent States,CIS,Treaty IGO,General,Regional,Belarus,1991,https://cis.minsk.by,https://cis.minsk.by/page/19324,Executive Committee leadership
 Commonwealth of Independent States,CIS,Treaty IGO,General,Regional,Belarus,1991,https://cis.minsk.by,https://cis.minsk.by/page/19300,Deputy Secretaries-General
-Commonwealth of Independent States,CIS,Treaty IGO,General,Regional,Belarus,1991,https://cis.minsk.by,https://cis.minsk.by/page/show?id=19305,CIS bodies
 Commonwealth of Nations,Commonwealth,Treaty IGO,General,Global,United Kingdom,1949,https://thecommonwealth.org,https://thecommonwealth.org/secretary-general-shirley-botchwey,Secretary-General
 Commonwealth of Nations,Commonwealth,Treaty IGO,General,Global,United Kingdom,1949,https://thecommonwealth.org,https://thecommonwealth.org/latest/secretary-general,Secretary-General
 Commonwealth of Nations,Commonwealth,Treaty IGO,General,Global,United Kingdom,1949,https://thecommonwealth.org,https://thecommonwealth.org/about-us,About / governance
-Community of Latin American and Caribbean States,CELAC,Treaty IGO,General,Regional,?,2010,https://celacinternational.org,,
 Community of Portuguese Language Countries,CPLP,Treaty IGO,General,Global,Portugal,1996,https://www.cplp.org,https://secretariadoexecutivo.cplp.org/quem-somos/estrutura/,Secretariat structure
 Community of Portuguese Language Countries,CPLP,Treaty IGO,General,Global,Portugal,1996,https://www.cplp.org,https://www.cplp.org/organizacao/orgaos/secretariado-executivo/,Executive Secretariat
 Community of Sahel-Saharan States,CEN-SAD,Treaty IGO,General,Sub-regional,Chad,1998,https://censad.int,https://censad.int/en/executive-secretariat/the-office/,Secretariat office
@@ -743,7 +699,6 @@ East African Community,EAC,Treaty IGO,General,Sub-regional,Tanzania,2000,https:/
 East African Community,EAC,Treaty IGO,General,Sub-regional,Tanzania,2000,https://www.eac.int,https://www.eac.int/the-secretariat,The Secretariat
 Economic Community of Central African States,ECCAS,Treaty IGO,General,Sub-regional,Gabon,1983,https://ceeac-eccas.org,https://www.ceeac-eccas.org/2023/05/24/who-are-we/,Who are we / organs
 Economic Community of Central African States,ECCAS,Treaty IGO,General,Sub-regional,Gabon,1983,https://ceeac-eccas.org,https://ceeac-eccas.org/2026/01/25/une-nouvelle-impulsion-pour-la-gouvernance-de-la-ceeac/,Commission appointments
-Economic Community of West African States,ECOWAS,Treaty IGO,General,Sub-regional,Nigeria,1975,https://www.ecowas.int,https://ecowas.int/institutions/the-commission/?page_id=1532,The Commission
 Forum for East Asia-Latin America Cooperation,FEALAC,Treaty IGO,General,Regional,South Korea,1999,https://www.fealac.org,,
 Gulf Cooperation Council,GCC,Treaty IGO,General,Sub-regional,Saudi Arabia,1981,https://www.gcc-sg.org,https://www.gcc-sg.org/en/GeneralSecretariat/SecretaryGeneral/Pages/default.aspx,Secretary-General
 Gulf Cooperation Council,GCC,Treaty IGO,General,Sub-regional,Saudi Arabia,1981,https://www.gcc-sg.org,https://www.gcc-sg.org/en-us/AboutGCC/Pages/OrganizationalStructure.aspx,Organizational Structure
@@ -758,8 +713,6 @@ Inter-American Commission of Women,CIM,Treaty IGO,General,Regional,United States
 Intergovernmental Authority on Development,IGAD,Treaty IGO,General,Sub-regional,Djibouti,1996,https://igad.int,https://igad.int/seniormanagement/,Senior Management
 Intergovernmental Authority on Development,IGAD,Treaty IGO,General,Sub-regional,Djibouti,1996,https://igad.int,https://igad.int/executive-secretary/,Executive Secretary
 Intergovernmental Authority on Development,IGAD,Treaty IGO,General,Sub-regional,Djibouti,1996,https://igad.int,https://igad.int/about/,IGAD Structure
-League of Arab States,Arab League,Treaty IGO,General,Regional,Egypt,1945,https://www.leagueofarabstates.net,http://www.leagueofarabstates.net/en/secretarygeneral/Pages/default.aspx?imgLib=SgPhotos,Secretary-General
-Mekong-Ganga Cooperation,MGC,Treaty IGO,General,Sub-regional,India,2000,?,https://mgc.gov.in/about,About / Structure
 Melanesian Spearhead Group,MSG,Treaty IGO,General,Sub-regional,Vanuatu,1986,https://msgsec.info,https://msgsec.info/our-team/,Our Team
 Melanesian Spearhead Group,MSG,Treaty IGO,General,Sub-regional,Vanuatu,1986,https://msgsec.info,https://msgsec.info/acting-director-general-ilan-kiloe/,Acting Director General
 Melanesian Spearhead Group,MSG,Treaty IGO,General,Sub-regional,Vanuatu,1986,https://msgsec.info,https://msgsec.info/about-msg-secretariat/,About Secretariat
@@ -768,9 +721,7 @@ Nordic Council,Nordic Council,Treaty IGO,General,Sub-regional,Denmark,1952,https
 Nordic Council,Nordic Council,Treaty IGO,General,Sub-regional,Denmark,1952,https://www.norden.org,https://norden.org/en/information/key-individuals,Key Individuals
 Organisation of Eastern Caribbean States,OECS,Treaty IGO,General,Sub-regional,Saint Lucia,1981,https://www.oecs.org,https://www.oecs.org/en/oecs-leadership-team,Leadership Team
 Organisation of Eastern Caribbean States,OECS,Treaty IGO,General,Sub-regional,Saint Lucia,1981,https://www.oecs.org,https://www.oecs.org/who-we-are/our-structure,OECS Structure
-Organisation of Islamic Cooperation,OIC,Treaty IGO,General,Regional,Saudi Arabia,1969,https://www.oic-oci.org,https://www.oic-oci.org/page/?p_id=38&p_ref=14&lan=en,General Secretariat
 Organisation of Islamic Cooperation,OIC,Treaty IGO,General,Regional,Saudi Arabia,1969,https://www.oic-oci.org,https://www.oic-oci.org/en/departments/24,Cabinet of Secretary General
-Organisation of Islamic Cooperation,OIC,Treaty IGO,General,Regional,Saudi Arabia,1969,https://www.oic-oci.org,https://www.oic-oci.org/page/?p_id=58&p_ref=30&lan=en,Secretary-General biography
 Organization for Democracy and Economic Development,GUAM,Treaty IGO,General,Regional,Ukraine,1997,https://guam-organization.org,https://guam-organization.org/en/category/secretary-general/,Secretary General
 Organization for Democracy and Economic Development,GUAM,Treaty IGO,General,Regional,Ukraine,1997,https://guam-organization.org,https://guam-organization.org/en/provision-on-the-secretariat-of-the-organization-for-democracy-and-economic-development-guam/,Secretariat provision
 Organization of American States,OAS,Treaty IGO,General,Regional,United States,1948,https://www.oas.org,https://www.oas.org/en/about/secretary_general.asp,Secretary General
@@ -789,7 +740,6 @@ Parliament of MERCOSUR,PARLASUR,Treaty IGO,General,Sub-regional,Uruguay,2005,htt
 Parliament of MERCOSUR,PARLASUR,Treaty IGO,General,Sub-regional,Uruguay,2005,https://www.parlamentomercosur.org,https://www.parlamentomercosur.org/innovaportal/v/20490/1/parlasur/integrantes.html,Integrantes
 Parliamentary Union of the OIC Member States,PUIC,Treaty IGO,General,Regional,Iran,1999,https://en.puic.org,https://en.puic.org/news/595,Secretary General CV
 Parliamentary Union of the OIC Member States,PUIC,Treaty IGO,General,Regional,Iran,1999,https://en.puic.org,https://en.puic.org/news/638,Introduction
-Polynesian Leaders Group,PLG,Treaty IGO,General,Sub-regional,Samoa,2011,?,,
 South Asian Association for Regional Cooperation,SAARC,Treaty IGO,General,Regional,Nepal,1985,https://www.saarc-sec.org,https://nepal.saarc-sec.org/index.php/about-saarc/about-secretariat/secretary-general,Secretary General
 South Asian Association for Regional Cooperation,SAARC,Treaty IGO,General,Regional,Nepal,1985,https://www.saarc-sec.org,https://www.saarc-sec.org/index.php/about-saarc/about-secretariat/directors,Directors
 South Asian Association for Regional Cooperation,SAARC,Treaty IGO,General,Regional,Nepal,1985,https://www.saarc-sec.org,https://nepal.saarc-sec.org/index.php/about-saarc/about-secretariat/former-secretaries-general,Former Secretaries General
@@ -813,13 +763,9 @@ African Union Mechanism for Police Cooperation,AFRIPOL,Treaty IGO,Justice & law,
 African Union Mechanism for Police Cooperation,AFRIPOL,Treaty IGO,Justice & law,Regional,Algeria,2014,https://afripol.africa-union.org,https://afripol.africa-union.org/about/structure,Structure
 ASEAN Chiefs of Police,ASEANAPOL,Treaty IGO,Justice & law,Regional,Malaysia,1981,https://www.aseanapol.org,http://www.aseanapol.org/about-aseanapol/permanent-secretariat,Permanent Secretariat
 ASEAN Chiefs of Police,ASEANAPOL,Treaty IGO,Justice & law,Regional,Malaysia,1981,https://www.aseanapol.org,http://www.aseanapol.org/about-aseanapol/governance,Governance
-European Commission for Democracy through Law,Venice Commission,Treaty IGO,Justice & law,Regional,France,1990,https://www.venice.coe.int,https://www.venice.coe.int/WebForms/members/default.aspx?lang=EN,Individual members
-European Commission for Democracy through Law,Venice Commission,Treaty IGO,Justice & law,Regional,France,1990,https://www.venice.coe.int,https://www.venice.coe.int/WebForms/pages/?p=01_01_Offices,President / officers
 Hague Conference on Private International Law,HCCH,Treaty IGO,Justice & law,Global,Netherlands,1893,https://www.hcch.net,https://www.hcch.net/en/governance/team-of-the-permanent-bureau,Permanent Bureau team
 Hague Conference on Private International Law,HCCH,Treaty IGO,Justice & law,Global,Netherlands,1893,https://www.hcch.net,https://www.hcch.net/en/governance/council-on-general-affairs,Council on General Affairs
 Inter-American Commission on Human Rights,IACHR,Treaty IGO,Justice & law,Regional,United States,1959,https://www.oas.org/en/iachr,https://www.oas.org/en/iachr/mandate/composition.asp,Composition / commissioners
-Inter-American Commission on Human Rights,IACHR,Treaty IGO,Justice & law,Regional,United States,1959,https://www.oas.org/en/iachr,https://www.oas.org/en/iachr/jsForm/?File=/en/iachr/media_center/preleases/2025/043.asp,Board 2025
-Inter-American Drug Abuse Control Commission,CICAD,Treaty IGO,Justice & law,Regional,United States,1986,https://www.cicad.oas.org,http://www.cicad.oas.org/Main/Template.asp?File=/main/aboutcicad/history/secretariat_eng.asp,Executive Secretariat
 Inter-American Drug Abuse Control Commission,CICAD,Treaty IGO,Justice & law,Regional,United States,1986,https://www.cicad.oas.org,https://cicad.oas.org/main/aboutcicad/dirmemberstates_spa.asp,Member state delegates
 International Anti-Corruption Academy,IACA,Treaty IGO,Justice & law,Global,Austria,2010,https://www.iaca.int,https://www.iaca.int/who-we-are/governance/board-of-governors.html,Board of Governors
 International Anti-Corruption Academy,IACA,Treaty IGO,Justice & law,Global,Austria,2010,https://www.iaca.int,https://www.iaca.int/who-we-are/governance/dean.html,Dean
@@ -862,12 +808,9 @@ Organisation internationale de la Francophonie,OIF,Treaty IGO,Science & culture,
 Pacific Community,SPC,Treaty IGO,Science & culture,Regional,New Caledonia,1947,https://www.spc.int,https://www.spc.int/about-us/executive-management,Executive Management
 Pacific Community,SPC,Treaty IGO,Science & culture,Regional,New Caledonia,1947,https://www.spc.int,https://www.spc.int/about-us/governance,Governance
 Pacific Community,SPC,Treaty IGO,Science & culture,Regional,New Caledonia,1947,https://www.spc.int,https://www.spc.int/about-us/director-general,Director-General
-Pan American Institute of Geography and History,PAIGH,Treaty IGO,Science & culture,Regional,Mexico,1928,https://www.ipgh.org,https://www.ipgh.org/en/?page_id=424,General Secretariat
 Standing Committee for Scientific and Technological Cooperation,COMSTECH,Treaty IGO,Science & culture,Regional,Pakistan,1981,https://comstech.org,https://comstech.org/our-team-list/,COMSTECH Team
 Standing Committee for Scientific and Technological Cooperation,COMSTECH,Treaty IGO,Science & culture,Regional,Pakistan,1981,https://comstech.org,https://comstech.org/comstech-secretariat/,COMSTECH Secretariat
 Standing Committee for Scientific and Technological Cooperation,COMSTECH,Treaty IGO,Science & culture,Regional,Pakistan,1981,https://comstech.org,https://www.comstech.org/comstech-executive-committee/,Executive Committee
-Alliance of Sahel States,AES,Treaty IGO,Security & defense,Sub-regional,Mali,2023,?,,
-Conference on Interaction and Confidence-Building Measures in Asia,CICA,Treaty IGO,Security & defense,Regional,Kazakhstan,1992,https://www.s-cica.org,https://www.s-cica.org/index.php?view=page&t=profile,Secretariat profile
 Council of Arab Interior Ministers,CAIM,Treaty IGO,Security & defense,Regional,Tunisia,1982,https://www.aimc.org.tn,,
 G5 Sahel,G5S,Treaty IGO,Security & defense,Sub-regional,Mauritania,2014,https://www.g5sahel.org,https://www.g5sahel.org/index.php/qui-sommes-nous/le-g5-sahel,Executive Secretariat
 Naif Arab University for Security Sciences,NAUSS,Treaty IGO,Security & defense,Regional,Saudi Arabia,1978,https://nauss.edu.sa,https://nauss.edu.sa/en/about-nauss/council/Pages/members.aspx,Supreme Council members
@@ -943,7 +886,6 @@ Mano River Union,MRU,Treaty IGO,Trade & economy,Sub-regional,Sierra Leone,1973,h
 Organisation for Economic Co-operation and Development,OECD,Treaty IGO,Trade & economy,Global,France,1961,https://www.oecd.org,https://www.oecd.org/en/about/directors.html,Directors
 Organisation for Economic Co-operation and Development,OECD,Treaty IGO,Trade & economy,Global,France,1961,https://www.oecd.org,https://www.oecd.org/about/secretary-general/,Secretary-General
 Organisation for Economic Co-operation and Development,OECD,Treaty IGO,Trade & economy,Global,France,1961,https://www.oecd.org,https://www.oecd.org/en/about/organisational-structure.html,Organisational structure
-Pacific Alliance,PA,Treaty IGO,Trade & economy,Regional,?,2011,https://alianzapacifico.net,https://alianzapacifico.net/consejo-de-ministros-de-la-alianza-del-pacifico-pakistan-e-irlanda-se-suman-como-estados-observadores-del-bloque/,Council of Ministers
 Secretariat for Central American Economic Integration,SIECA,Treaty IGO,Trade & economy,Sub-regional,Guatemala,1960,https://www.sieca.int,https://www.sieca.int/acerca/directivos-titulares/,Senior officials
 Secretariat for Central American Economic Integration,SIECA,Treaty IGO,Trade & economy,Sub-regional,Guatemala,1960,https://www.sieca.int,https://www.sieca.int/index.php/acerca-de-la-sieca/informacion-general/secretaria/secretaria-general/,General Secretariat
 Southern African Customs Union,SACU,Treaty IGO,Trade & economy,Sub-regional,Namibia,1910,https://www.sacu.int,https://www.sacu.int/office-of-the-executive-secretary,Office of Executive Secretary
@@ -952,14 +894,11 @@ Southern African Customs Union,SACU,Treaty IGO,Trade & economy,Sub-regional,Nami
 Southern Common Market,MERCOSUR,Treaty IGO,Trade & economy,Sub-regional,Uruguay,1991,https://www.mercosur.int,https://www.mercosur.int/quienes-somos/secretaria/,Secretariat
 Southern Common Market,MERCOSUR,Treaty IGO,Trade & economy,Sub-regional,Uruguay,1991,https://www.mercosur.int,https://mercosur.int/quienes-somos/secretaria/direccion,Secretariat Directorate
 Southern Common Market,MERCOSUR,Treaty IGO,Trade & economy,Sub-regional,Uruguay,1991,https://www.mercosur.int,https://www.mercosur.int/quienes-somos/organigrama-mercosur/,Organizational chart
-United States-Mexico-Canada Agreement,USMCA,Treaty IGO,Trade & economy,Regional,?,2020,https://can-mex-usa-sec.org,https://can-mex-usa-sec.org/secretariat/index.aspx?lang=eng,The Secretariat
 World Customs Organization,WCO,Treaty IGO,Trade & economy,Global,Belgium,1952,https://www.wcoomd.org,https://www.wcoomd.org/en/about-us/what-is-the-wco/secretary-general.aspx,Secretary General
 World Customs Organization,WCO,Treaty IGO,Trade & economy,Global,Belgium,1952,https://www.wcoomd.org,https://www.wcoomd.org/en/about-us/wco-structure/wco-secretariat.aspx,WCO Secretariat
 World Trade Organization,WTO,Treaty IGO,Trade & economy,Global,Switzerland,1995,https://www.wto.org,https://www.wto.org/english/thewto_e/dg_e/dg_e.htm,Director-General
 World Trade Organization,WTO,Treaty IGO,Trade & economy,Global,Switzerland,1995,https://www.wto.org,https://www.wto.org/english/thewto_e/dg_e/ddgs_e.htm,Deputy Directors-General
 World Trade Organization,WTO,Treaty IGO,Trade & economy,Global,Switzerland,1995,https://www.wto.org,https://www.wto.org/english/thewto_e/dg_e/dg_cabinet_e.htm,Office of the DG
-Arab Civil Aviation Organization,ACAO,Treaty IGO,Transport,Regional,Morocco,1996,https://acao.org.ma,https://acao.org.ma/site/en/page.php?cat=&idem=22,General Directorate
-Arab Civil Aviation Organization,ACAO,Treaty IGO,Transport,Regional,Morocco,1996,https://acao.org.ma,https://acao.org.ma/site/en/page.php?idem=22&cat=3&pgi=32&tpct=0,Director General
 European Organisation for the Safety of Air Navigation,EUROCONTROL,Treaty IGO,Transport,Regional,Belgium,1960,https://www.eurocontrol.int,https://www.eurocontrol.int/info/executive-body,Executive body
 European Organisation for the Safety of Air Navigation,EUROCONTROL,Treaty IGO,Transport,Regional,Belgium,1960,https://www.eurocontrol.int,https://www.eurocontrol.int/info/governing-bodies,Governing bodies
 Asia-Pacific Fishery Commission,APFIC,UN system body,Agriculture & food,Regional,Thailand,1948,https://www.fao.org/apfic,https://www.fao.org/apfic/about/the-commission--executive-committee--committees-and-working-parties/en,Commission & Executive Committee
