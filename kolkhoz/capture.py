@@ -135,7 +135,7 @@ async def capture_urls(
     async def snap(url: str) -> tuple[str, Snapshot]:
         async with sem:
             snapshot = await pravda.snapshot(url)
-            log.info("snapshotted %s has_error=%s", snapshot.url, snapshot.error is None)
+            log.info("snapshotted %s has_error=%s", snapshot.url, snapshot.error is not None)
             return url, snapshot
 
     pairs = await asyncio.gather(*(snap(url) for url in urls))
