@@ -18,6 +18,7 @@ import logging
 import os
 
 import fsspec
+from fsspec.implementations.asyn_wrapper import AsyncFileSystemWrapper
 from PIL import Image
 from pravda import Pravda, PravdaConfig, Snapshot
 
@@ -46,12 +47,22 @@ def storage_filesystem(settings: PravdaSettings):
     Pravda resolves each snapshot's ``prefix`` against this same base path, so
     opening ``<prefix>/<filename>`` on this filesystem locates the artifact for
     both local paths and remote (``gs://``/``s3://``) URLs.
+
+    Synchronous backends (e.g. the local filesystem) are wrapped so reads use
+    the same async API as remote ones. This mirrors Pravda's own
+    ``Storage.from_url`` and, crucially, keeps every artifact read on the
+    running event loop: reading via the async API avoids fsspec's sync bridge,
+    which would otherwise drive the shared (async, e.g. ``gcsfs``) instance from
+    its background loop while Pravda has bound its session to this loop —
+    raising "got Future attached to a different loop".
     """
     fs, _ = fsspec.core.url_to_fs(settings.storage_base_path)
+    if not fs.async_impl:
+        fs = AsyncFileSystemWrapper(fs)
     return fs
 
 
-def read_artifact(fs, snapshot: Snapshot, filename: str | None) -> bytes:
+async def read_artifact(fs, snapshot: Snapshot, filename: str | None) -> bytes:
     """Read a snapshot artifact blob from the shared storage backend.
 
     ``snapshot.prefix`` is the backend-resolved directory (base path plus the
@@ -59,14 +70,16 @@ def read_artifact(fs, snapshot: Snapshot, filename: str | None) -> bytes:
     content-addressed name Pravda stored. Both are required for a stored
     artifact: a missing one is a malformed snapshot, so this fails loud rather
     than returning empty bytes.
+
+    Reads through the async API on the current event loop; see
+    ``storage_filesystem`` for why the sync ``fs.open`` path is avoided.
     """
     if snapshot.prefix is None:
         raise ValueError(f"snapshot {snapshot.id} has no storage prefix")
     if filename is None:
         raise ValueError(f"snapshot {snapshot.id} has no artifact filename")
     path = os.path.join(snapshot.prefix, filename)
-    with fs.open(path, "rb") as fh:
-        return fh.read()
+    return await fs._cat_file(path)
 
 
 def is_blank(blob: bytes) -> bool:
