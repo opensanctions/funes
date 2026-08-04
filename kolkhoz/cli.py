@@ -9,11 +9,13 @@ from openai import OpenAI
 from pravda import Snapshot, migrate
 
 from kolkhoz.capture import (
+    OperationalError,
     capture_urls,
     is_blank,
     pravda_client,
     read_artifact,
     storage_filesystem,
+    summarise_errors,
 )
 from kolkhoz.config import Config, load_config
 from kolkhoz.export import holder_to_record, write_outputs
@@ -123,12 +125,16 @@ async def _run_pipeline(
     fs = storage_filesystem(config.pravda)
     pravda = pravda_client(config.pravda)
     async with pravda:
-        captures = await capture_urls(pravda, urls, concurrency)
+        captures, errors = await capture_urls(pravda, urls, concurrency)
 
         extracted = 0
         hits = 0
         for dataset, url, organization in associations:
-            snapshot = captures[url]
+            snapshot = captures.get(url)
+            if snapshot is None:
+                # Operational capture failure: already logged and counted in
+                # `errors`; keep going rather than abort the run.
+                continue
             if snapshot.error is not None:
                 log.warning("  skip %s — capture failed: %s", url, snapshot.error)
                 continue
@@ -149,7 +155,18 @@ async def _run_pipeline(
                 )
                 continue
 
-            holders = await extract_snapshot(snapshot, fs, config, client)
+            try:
+                holders = await extract_snapshot(snapshot, fs, config, client)
+            except Exception as exc:
+                # One page's extraction failing (LLM/parse/IO) must not abort
+                # the run; log, count, and move on.
+                log.warning(
+                    "  extraction failed for %s: %s: %s", url, type(exc).__name__, exc
+                )
+                errors.append(
+                    OperationalError("extract", url, f"{type(exc).__name__}: {exc}")
+                )
+                continue
             groups[dataset].extend(
                 holder_to_record(dataset, url, organization, snapshot, holder)
                 for holder in holders
@@ -160,6 +177,7 @@ async def _run_pipeline(
 
     await write_outputs(groups, config.paths)
     log.info("extraction: %d hit, %d miss", hits, extracted - hits)
+    summarise_errors(errors)
 
 
 @cli.command(
