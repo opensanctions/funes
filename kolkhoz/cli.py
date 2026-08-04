@@ -43,10 +43,10 @@ async def extract_snapshot(
     client: OpenAI,
 ) -> list[dict]:
     """Extract flattened holder observations from one captured snapshot."""
-    text = read_artifact(fs, snapshot, snapshot.plaintext).decode(
+    text = (await read_artifact(fs, snapshot, snapshot.plaintext)).decode(
         "utf-8", errors="replace"
     )
-    html = read_artifact(fs, snapshot, snapshot.rendered_html).decode(
+    html = (await read_artifact(fs, snapshot, snapshot.rendered_html)).decode(
         "utf-8", errors="replace"
     )
 
@@ -56,7 +56,7 @@ async def extract_snapshot(
     if reason is not None:
         log.info("  → %s → including screenshot", reason)
         if snapshot.screenshot is not None:
-            blob = read_artifact(fs, snapshot, snapshot.screenshot)
+            blob = await read_artifact(fs, snapshot, snapshot.screenshot)
             if not is_blank(blob):
                 screenshot_blob = blob
     metadata = metadata_from_html(snapshot.url, html)
@@ -158,7 +158,7 @@ async def _run_pipeline(
             if holders:
                 hits += 1
 
-    write_outputs(groups, config.paths)
+    await write_outputs(groups, config.paths)
     log.info("extraction: %d hit, %d miss", hits, extracted - hits)
 
 
