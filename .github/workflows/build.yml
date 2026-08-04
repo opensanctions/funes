@@ -16,7 +16,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE: ghcr.io/opensanctions/kolkhoz
+  IMAGE: ghcr.io/opensanctions/funes
 
 jobs:
   build:
