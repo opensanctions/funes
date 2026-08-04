@@ -158,7 +158,7 @@ async def _run_pipeline(
             if holders:
                 hits += 1
 
-    write_outputs(groups, config.paths)
+    await write_outputs(groups, config.paths)
     log.info("extraction: %d hit, %d miss", hits, extracted - hits)
 
 
