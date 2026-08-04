@@ -58,17 +58,10 @@ def holder_to_record(
 
 
 async def write_outputs(groups: dict[str, list[dict]], paths: PathsConfig) -> None:
-    """Write exactly the records produced by the current run.
-
-    Runs inside the pipeline's event loop, so it uses the async fsspec API on
-    that loop rather than the synchronous ``fs.makedirs``/``fs.open`` bridge;
-    see ``kolkhoz.capture.storage_filesystem`` for why mixing the sync bridge
-    with Pravda's async use of the shared (e.g. ``gcsfs``) instance raises
-    "got Future attached to a different loop". Synchronous backends (local
-    filesystem) are wrapped so the same async calls work there too.
-    """
+    """Write exactly the records produced by the current run."""
     fs, base = fsspec.core.url_to_fs(paths.output_base_path)
     if not fs.async_impl:
+        # Consistently use async API on pipeline's event loop
         fs = AsyncFileSystemWrapper(fs)
     date = datetime.now().strftime(EXPORT_DATE_FORMAT)
     total = 0
