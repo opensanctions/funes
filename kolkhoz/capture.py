@@ -16,6 +16,8 @@ import asyncio
 import io
 import logging
 import os
+from collections import Counter
+from dataclasses import dataclass
 
 import fsspec
 from fsspec.implementations.asyn_wrapper import AsyncFileSystemWrapper
@@ -131,25 +133,80 @@ def split_image(blob: bytes, tile: int, overlap: float) -> list[bytes]:
     return tiles
 
 
+@dataclass
+class OperationalError:
+    """A per-URL failure that must not abort the whole run.
+
+    Distinct from the capture failures Pravda *persists* on a snapshot with
+    ``error`` set (HTTP status, browser/context failures): those come back as
+    an errored Snapshot and are recorded in the database. An
+    ``OperationalError`` is one Pravda *raises* instead — e.g. an inner HAR
+    processing or storage timeout, which Pravda's own code notes is an
+    operational error rather than persisted evidence. We gather these, count
+    them, and let the run finish; they belong in the log, not the database.
+    """
+
+    stage: str
+    url: str
+    error: str
+
+
+def summarise_errors(errors: list[OperationalError]) -> None:
+    """Log a summary of the operational errors gathered during the run."""
+    if not errors:
+        log.info("operational errors: none")
+        return
+    by_stage = Counter(e.stage for e in errors)
+    by_type = Counter(e.error.split(":", 1)[0] for e in errors)
+    log.warning(
+        "operational errors: %d across %d URL(s) — by stage: %s",
+        len(errors),
+        len({e.url for e in errors}),
+        ", ".join(f"{stage}={n}" for stage, n in by_stage.most_common()),
+    )
+    for etype, count in by_type.most_common():
+        log.warning("  %s: %d", etype, count)
+    for error in errors:
+        log.warning("  [%s] %s — %s", error.stage, error.url, error.error)
+
+
 async def capture_urls(
     pravda: Pravda, urls: list[str], concurrency: int
-) -> dict[str, Snapshot]:
+) -> tuple[dict[str, Snapshot], list[OperationalError]]:
     """Capture each URL once, concurrently, through one Pravda instance.
 
     At most *concurrency* captures run at once (an ``asyncio.Semaphore``
     bounds them); each is otherwise independent. Returns a mapping of the
-    requested URL to the Snapshot Pravda persisted for it. Pravda persists
-    capture failures with ``error`` set rather than raising, so the mapping
-    covers every requested URL — callers decide how to treat errored
-    snapshots.
+    requested URL to the Snapshot Pravda persisted for it, plus a list of
+    operational errors. Pravda persists capture failures with ``error`` set
+    rather than raising, so those still appear in the mapping as errored
+    snapshots. A URL that Pravda fails *operationally* (raising, e.g. a HAR
+    timeout) is absent from the mapping and recorded as an ``OperationalError``
+    instead, so one such failure cannot abort the whole run.
     """
     sem = asyncio.Semaphore(concurrency)
+    captures: dict[str, Snapshot] = {}
+    errors: list[OperationalError] = []
 
-    async def snap(url: str) -> tuple[str, Snapshot]:
+    async def snap(url: str) -> None:
         async with sem:
-            snapshot = await pravda.snapshot(url)
+            try:
+                snapshot = await pravda.snapshot(url)
+            except Exception as exc:
+                # Never abort the run for one URL. CancelledError /
+                # KeyboardInterrupt are BaseException and still propagate.
+                log.warning(
+                    "capture failed operationally for %s: %s: %s",
+                    url,
+                    type(exc).__name__,
+                    exc,
+                )
+                errors.append(
+                    OperationalError("capture", url, f"{type(exc).__name__}: {exc}")
+                )
+                return
             log.info("snapshotted %s has_error=%s", snapshot.url, snapshot.error is not None)
-            return url, snapshot
+            captures[url] = snapshot
 
-    pairs = await asyncio.gather(*(snap(url) for url in urls))
-    return dict(pairs)
+    await asyncio.gather(*(snap(url) for url in urls))
+    return captures, errors
