@@ -12,7 +12,7 @@ wheels/
 .envrc
 CLAUDE.md
 AGENTS.md
-kolkhoz.log
+funes.log
 *.log
 *.db
 *.db-journal

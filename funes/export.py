@@ -9,9 +9,9 @@ import fsspec
 from fsspec.implementations.asyn_wrapper import AsyncFileSystemWrapper
 from pravda import Snapshot
 
-from kolkhoz.config import PathsConfig
+from funes.config import PathsConfig
 
-log = logging.getLogger("kolkhoz")
+log = logging.getLogger("funes")
 
 # The flat JSONL schema handed to zavod. One record per (person, position)
 # observation extracted from one snapshot. Fixed key order, UTF-8, source

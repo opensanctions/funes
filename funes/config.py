@@ -19,7 +19,7 @@ class PravdaSettings:
     """Environment-backed settings for Pravda's in-process async client.
 
     These three values are handed to Pravda's own ``PravdaConfig`` at the
-    application boundary. The database URL is also used by Kolkhoz.
+    application boundary. The database URL is also used by Funes.
     """
 
     database_url: str

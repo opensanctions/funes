@@ -1,5 +1,5 @@
 [project]
-name = "kolkhoz"
+name = "funes"
 version = "0.1.0"
 description = "Orchestrate web capture and LLM extraction of political position holders into structured data."
 readme = "README.md"
@@ -21,7 +21,7 @@ dev = [
 ]
 
 [project.scripts]
-kolkhoz = "kolkhoz.cli:cli"
+funes = "funes.cli:cli"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,7 +1,7 @@
 FROM python:3.13-slim
 
-LABEL org.opencontainers.image.title="Kolkhoz"
-LABEL org.opencontainers.image.source="https://github.com/opensanctions/kolkhoz"
+LABEL org.opencontainers.image.title="Funes"
+LABEL org.opencontainers.image.source="https://github.com/opensanctions/funes"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -24,7 +24,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
-COPY kolkhoz ./kolkhoz
+COPY funes ./funes
 COPY evaluate.py README.md ./
 RUN uv sync --frozen --no-dev
 
@@ -39,5 +39,5 @@ USER app
 # CronJob spec).
 ENV INPUT_BASE_PATH=/app/datasets
 
-ENTRYPOINT ["kolkhoz"]
+ENTRYPOINT ["funes"]
 CMD ["run"]
