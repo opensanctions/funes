@@ -5,7 +5,7 @@ Owns the structured-output schema (``Person`` / ``Position`` /
 text/screenshot decision (``screenshot_reason``), and the ``extract()`` call.
 ``screenshot_parts``
 tiles a screenshot blob into model input parts using ``split_image`` from
-:mod:`kolkhoz.capture`.
+:mod:`funes.capture`.
 
 The OpenAI client is an explicit argument: it is constructed at the CLI
 boundary, not held as module-global state.
@@ -18,10 +18,10 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
-from kolkhoz.capture import split_image
-from kolkhoz.config import ImageConfig, ModelConfig
+from funes.capture import split_image
+from funes.config import ImageConfig, ModelConfig
 
-log = logging.getLogger("kolkhoz")
+log = logging.getLogger("funes")
 
 REASONING_EFFORT = "low"
 

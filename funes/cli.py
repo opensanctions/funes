@@ -8,7 +8,7 @@ import click
 from openai import OpenAI
 from pravda import Snapshot, migrate
 
-from kolkhoz.capture import (
+from funes.capture import (
     OperationalError,
     capture_urls,
     is_blank,
@@ -17,24 +17,24 @@ from kolkhoz.capture import (
     storage_filesystem,
     summarise_errors,
 )
-from kolkhoz.config import Config, load_config
-from kolkhoz.export import holder_to_record, write_outputs
-from kolkhoz.extract import (
+from funes.config import Config, load_config
+from funes.export import holder_to_record, write_outputs
+from funes.extract import (
     extract,
     flatten_persons,
     metadata_from_html,
     screenshot_reason,
 )
-from kolkhoz.sources import InputRow, load_inputs
+from funes.sources import InputRow, load_inputs
 
-log = logging.getLogger("kolkhoz")
+log = logging.getLogger("funes")
 
 
 @click.group()
 def cli() -> None:
     root = logging.getLogger()
     root.setLevel(logging.INFO)
-    root.addHandler(logging.FileHandler("kolkhoz.log"))
+    root.addHandler(logging.FileHandler("funes.log"))
     root.addHandler(logging.StreamHandler())
 
 
@@ -99,7 +99,7 @@ async def _run_pipeline(
     A URL repeated within a dataset collapses to one page association. The
     same URL in several datasets remains several associations, backed by one
     Pravda capture. Sampling happens over associations before capture.
-    Kolkhoz keeps no database state of its own; Pravda alone persists the
+    Funes keeps no database state of its own; Pravda alone persists the
     captured evidence.
     """
     associations: list[tuple[str, str, str]] = []

@@ -33,8 +33,8 @@ import click
 from bs4 import BeautifulSoup
 from openai import OpenAI
 
-from kolkhoz.config import load_config
-from kolkhoz.extract import extract, flatten_persons, metadata_from_html
+from funes.config import load_config
+from funes.extract import extract, flatten_persons, metadata_from_html
 
 log = logging.getLogger("evaluate")
 

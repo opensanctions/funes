@@ -3,11 +3,11 @@
 - ``capture_urls`` captures each URL once, concurrently, through one
   long-lived Pravda instance (bounded by a semaphore).
 - ``read_artifact`` reads a snapshot artifact blob from the shared fsspec
-  storage backend Kolkhoz and Pravda both use.
+  storage backend Funes and Pravda both use.
 - ``is_blank`` / ``split_image`` are image primitives over a screenshot blob
   (shared by capture and the extraction tiling path).
 
-Pravda is an in-process async library. Kolkhoz constructs one ``Pravda``
+Pravda is an in-process async library. Funes constructs one ``Pravda``
 instance from its environment-backed settings and reuses it across captures;
 it never speaks HTTP to Pravda.
 """
@@ -24,16 +24,16 @@ from fsspec.implementations.asyn_wrapper import AsyncFileSystemWrapper
 from PIL import Image
 from pravda import Pravda, PravdaConfig, Snapshot
 
-from kolkhoz.config import PravdaSettings
+from funes.config import PravdaSettings
 
-log = logging.getLogger("kolkhoz")
+log = logging.getLogger("funes")
 
 
 def pravda_client(settings: PravdaSettings) -> Pravda:
-    """Construct a Pravda instance from Kolkhoz's environment-backed settings.
+    """Construct a Pravda instance from Funes's environment-backed settings.
 
     The ``PravdaConfig`` is built here, at the application boundary, from the
-    explicit settings Kolkhoz owns; Kolkhoz holds no Pravda URL of its own.
+    explicit settings Funes owns; Funes holds no Pravda URL of its own.
     """
     config = PravdaConfig(
         database_url=settings.database_url,

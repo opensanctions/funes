@@ -1,6 +1,6 @@
-# Kolkhoz-owned infrastructure for Pravda's in-process async client.
+# Funes-owned infrastructure for Pravda's in-process async client.
 #
-# Pravda connects from Kolkhoz's process to three things Kolkhoz owns and
+# Pravda connects from Funes's process to three things Funes owns and
 # runs here: a remote headed Chrome (Playwright run-server), Pravda's Postgres
 # database, and the artifact store (a local path on disk by default,
 # configured via PRAVDA_STORAGE_BASE_PATH).
