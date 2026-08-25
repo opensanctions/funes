@@ -39,9 +39,8 @@ class ImageConfig:
 
 
 @dataclass(frozen=True)
-class PathsConfig:
+class InputConfig:
     input_base_path: str
-    output_base_path: str
 
 
 @dataclass(frozen=True)
@@ -49,7 +48,7 @@ class Config:
     pravda: PravdaSettings
     model: ModelConfig
     image: ImageConfig
-    paths: PathsConfig
+    input: InputConfig
 
 
 def load_config() -> Config:
@@ -66,8 +65,7 @@ def load_config() -> Config:
             tile_size=int(os.environ["IMAGE_TILE_SIZE"]),
             tile_overlap=float(os.environ["IMAGE_TILE_OVERLAP"]),
         ),
-        paths=PathsConfig(
+        input=InputConfig(
             input_base_path=os.environ["INPUT_BASE_PATH"],
-            output_base_path=os.environ["OUTPUT_BASE_PATH"],
         ),
     )

@@ -166,9 +166,7 @@ class PageMetadata(BaseModel):
 
 
 # Structured-output schema for extraction. Nested: a Person holds many
-# Positions; person-level facts live on the person. Storage and export stay
-# flat (one row per person-position), so ``flatten_persons`` is the single
-# boundary that owns the nested→flat mapping.
+# Positions; person-level facts live on the person.
 class Position(BaseModel):
     name: str = Field(
         min_length=1,
@@ -236,33 +234,6 @@ class Extraction(BaseModel):
         default_factory=list,
         description="Position holders stated on the page. Empty list if none.",
     )
-
-
-def flatten_persons(extraction: Extraction) -> list[dict]:
-    """Flatten the nested extraction into one dict per (person, position).
-
-    Person-level fields repeat across a person's positions so every JSONL row
-    is self-contained. The dict keys are the flat output names; this is the
-    only place that knows how nested maps to flat.
-    """
-    rows: list[dict] = []
-    for person in extraction.persons:
-        for position in person.positions:
-            rows.append(
-                {
-                    "person_name": person.name,
-                    "position_name": position.name,
-                    "person_dob": person.dob,
-                    "person_bio": person.bio,
-                    "person_countries": person.countries,
-                    "position_organization": position.organization,
-                    "position_description": position.description,
-                    "position_jurisdiction": position.jurisdiction,
-                    "position_start_date": position.start_date,
-                    "position_end_date": position.end_date,
-                }
-            )
-    return rows
 
 
 def extract(

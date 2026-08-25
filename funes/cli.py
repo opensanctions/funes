@@ -24,13 +24,7 @@ from funes.capture import (
     summarise_errors,
 )
 from funes.config import Config, load_config
-from funes.export import run_export
-from funes.extract import (
-    extract,
-    flatten_persons,
-    metadata_from_html,
-    screenshot_reason,
-)
+from funes.extract import Extraction, extract, metadata_from_html, screenshot_reason
 from funes.migrate import migrate
 from funes.sources import InputRow, load_inputs
 
@@ -50,8 +44,8 @@ async def extract_snapshot(
     fs,
     config: Config,
     client: OpenAI,
-) -> list[dict]:
-    """Extract flattened holder observations from one captured snapshot."""
+) -> Extraction:
+    """Extract holder observations from one captured snapshot."""
     text = (await read_artifact(fs, snapshot.plaintext)).decode(
         "utf-8", errors="replace"
     )
@@ -77,9 +71,13 @@ async def extract_snapshot(
         text,
         screenshot_blob,
     )
-    holders = flatten_persons(extraction)
-    log.info("%s → %d holder(s)", snapshot.url, len(holders))
-    return holders
+    log.info(
+        "%s → %d person(s), %d position(s)",
+        snapshot.url,
+        len(extraction.persons),
+        sum(len(p.positions) for p in extraction.persons),
+    )
+    return extraction
 
 
 async def run_pipeline(
@@ -183,7 +181,7 @@ async def _run_pipeline(
                         continue
 
                     try:
-                        holders = await extract_snapshot(snapshot, fs, config, client)
+                        result = await extract_snapshot(snapshot, fs, config, client)
                     except (OpenAIError, OSError, ValidationError) as exc:
                         error = f"{type(exc).__name__}: {exc}"
                         log.warning("  extraction failed for %s: %s", url, error)
@@ -195,9 +193,9 @@ async def _run_pipeline(
                         )
                         errors.append(OperationalError("extract", url, error))
                         continue
-                    db.extraction_succeeded(session, extraction, snapshot, holders)
+                    db.extraction_succeeded(session, result, snapshot)
                     extracted += 1
-                    if holders:
+                    if result.persons:
                         hits += 1
 
             run.finished_at = datetime.now(UTC)
@@ -235,34 +233,13 @@ async def _run_pipeline(
 def run_cmd(dataset: str | None, sample: int | None, concurrency: int) -> None:
     config = load_config()
     client = OpenAI()
-    inputs = load_inputs(config.paths.input_base_path)
+    inputs = load_inputs(config.input.input_base_path)
     if dataset is not None:
         inputs = [(d, rows) for d, rows in inputs if d == dataset]
     log.info("%d input CSV(s)", len(inputs))
     for dataset_name, rows in inputs:
         log.info("dataset %s: %d row(s)", dataset_name, len(rows))
     asyncio.run(run_pipeline(inputs, sample, concurrency, config, client))
-
-
-@cli.command(
-    "export",
-    help=(
-        "Export the latest successful extraction for each dataset and URL as "
-        "JSONL under <output-base>/<dataset>/<date>.jsonl."
-    ),
-)
-def export_cmd() -> None:
-    config = load_config()
-
-    async def export() -> None:
-        await migrate(config.pravda.database_url)
-        engine = create_async_engine(config.pravda.database_url)
-        try:
-            await run_export(engine, config.paths)
-        finally:
-            await engine.dispose()
-
-    asyncio.run(export())
 
 
 if __name__ == "__main__":

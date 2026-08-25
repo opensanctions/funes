@@ -33,15 +33,16 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 
 from funes.config import load_config
-from funes.extract import extract, flatten_persons, metadata_from_html
+from funes.extract import Extraction, extract, metadata_from_html
 
 log = logging.getLogger("evaluate")
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
-# The flat extraction/storage schema. Organisation and term dates join person
-# and title in the observation key so repeated terms of the same office remain
-# distinct. Remaining fields are exact-compared on matched observations.
+# The flat holder schema used by the answer key. Organisation and term dates
+# join person and title in the observation key so repeated terms of the same
+# office remain distinct. Remaining fields are exact-compared on matched
+# observations.
 HOLDER_PERSON_NAME = "person_name"
 HOLDER_POSITION_NAME = "position_name"
 HOLDER_KEY_FIELDS = [
@@ -59,6 +60,32 @@ HOLDER_FIELDS = [
     "position_jurisdiction",
 ]
 HOLDER_EXPECTED_KEYS = [*HOLDER_KEY_FIELDS, *HOLDER_FIELDS]
+
+
+def flatten_persons(extraction: Extraction) -> list[dict]:
+    """Project the nested extraction into the flat rows the answer key uses.
+
+    Evaluation compares one (person, position) observation per row, so this
+    local projection repeats person-level fields across a person's positions.
+    """
+    rows: list[dict] = []
+    for person in extraction.persons:
+        for position in person.positions:
+            rows.append(
+                {
+                    "person_name": person.name,
+                    "position_name": position.name,
+                    "person_dob": person.dob,
+                    "person_bio": person.bio,
+                    "person_countries": person.countries,
+                    "position_organization": position.organization,
+                    "position_description": position.description,
+                    "position_jurisdiction": position.jurisdiction,
+                    "position_start_date": position.start_date,
+                    "position_end_date": position.end_date,
+                }
+            )
+    return rows
 
 
 # ===========================================================================
