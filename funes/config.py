@@ -44,11 +44,17 @@ class InputConfig:
 
 
 @dataclass(frozen=True)
+class SessionsConfig:
+    base_path: str
+
+
+@dataclass(frozen=True)
 class Config:
     pravda: PravdaSettings
     model: ModelConfig
     image: ImageConfig
     input: InputConfig
+    sessions: SessionsConfig
 
 
 def load_config() -> Config:
@@ -67,5 +73,8 @@ def load_config() -> Config:
         ),
         input=InputConfig(
             input_base_path=os.environ["INPUT_BASE_PATH"],
+        ),
+        sessions=SessionsConfig(
+            base_path=os.environ["SESSIONS_BASE_PATH"],
         ),
     )

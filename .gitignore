@@ -13,3 +13,4 @@ CLAUDE.md
 *.log
 *.ftm
 storage/
+sessions/
