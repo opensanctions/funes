@@ -8,7 +8,7 @@
 #   docker compose up -d
 #
 # With the defaults below, set in .env:
-#   PRAVDA_DATABASE_URL=postgresql+asyncpg://pravda:pravda@localhost:5432/pravda
+#   PRAVDA_DATABASE_URL=postgresql+psycopg://pravda:pravda@localhost:5432/pravda
 #   PRAVDA_BROWSER_WS_URL=ws://localhost:3000
 #   PRAVDA_STORAGE_BASE_PATH=./storage
 services:

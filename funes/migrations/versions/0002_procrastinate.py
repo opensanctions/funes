@@ -10,8 +10,8 @@ its own, so Funes's Alembic ledger tracks it on Procrastinate's behalf:
 this revision executes the immutable vendored SQL asset verbatim (copied
 from procrastinate/sql/schema.sql at pin time) rather than reading the
 installed package, so the migration stays reproducible across Procrastinate
-upgrades. Future Procrastinate bumps get a new vendored asset and a new
-Funes revision.
+upgrades. Future Procrastinate bumps vendor the relevant upstream upgrade
+SQL in a new Funes revision.
 """
 
 from collections.abc import Sequence

@@ -10,16 +10,16 @@ Funes is an orchestrator that turns raw web pages into structured data about pol
 ## Stack
 
 - **Python** 3.13+ managed by **uv**.
-- **Pravda** ([github.com/opensanctions/pravda](https://github.com/opensanctions/pravda)), published on PyPI as `opensanctions-pravda` (imported as `pravda`), for web page capture and storage, embedded as an in-process async library. Funes owns the infrastructure Pravda connects to — a headed Chrome browser (remote Playwright server), an async Postgres database, and an fsspec artifact store. Connection settings are `PRAVDA_DATABASE_URL`, `PRAVDA_BROWSER_WS_URL`, and `PRAVDA_STORAGE_BASE_PATH` (see `.env`). Funes constructs Pravda's `PravdaConfig` at the CLI boundary, reads artifacts from the shared storage backend over fsspec, and applies Pravda's packaged migrations (`pravda.migrate`) idempotently before the `run` command opens a `Pravda` instance.
+- **Pravda** ([github.com/opensanctions/pravda](https://github.com/opensanctions/pravda)), published on PyPI as `opensanctions-pravda` (imported as `pravda`), for web page capture and storage, embedded as an in-process async library. Funes owns the infrastructure Pravda connects to — a headed Chrome browser (remote Playwright server), an async Postgres database, and an fsspec artifact store. Connection settings are `PRAVDA_DATABASE_URL`, `PRAVDA_BROWSER_WS_URL`, and `PRAVDA_STORAGE_BASE_PATH` (see `.env`). Funes constructs Pravda's `PravdaConfig` from worker configuration, reads artifacts from the shared storage backend over fsspec, and applies Pravda's packaged migrations (`pravda.migrate`) through the explicit `funes migrate` release command.
 - Development infrastructure is shared. Do not create ad-hoc databases or browsers for tests.
-- Funes persists extraction runs, each successful extraction storing nested extraction-scoped persons and their positions, in the PostgreSQL database shared with Pravda.
+- Funes queues extraction jobs through Procrastinate and persists each successful extraction with nested extraction-scoped persons and their positions in the PostgreSQL database shared with Pravda.
 
 ## Project structure
 
 ```
-funes/           # the package: cli.py (run), capture.py
-                   # (Pravda client + capture/artifact helpers), extract.py,
-                   # sources.py, config.py
+funes/           # the package: cli.py (migrate, enqueue, worker), queue.py,
+                   # tasks.py, capture.py (Pravda client + artifact helpers),
+                   # extract.py, sources.py, config.py
 evaluate.py        # score the extraction pipeline against synthetic fixtures
 fixtures/          # one directory per fixture: page.html, expected.json, optional screenshot.png
 ```

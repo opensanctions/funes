@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from funes import db
 from funes.capture import is_blank, pravda_client, read_artifact, storage_filesystem
-from funes.config import Config
+from funes.config import Config, ImageConfig, ModelConfig
 from funes.extract import Extraction, extract, metadata_from_html, screenshot_reason
 
 log = logging.getLogger("funes")
@@ -31,7 +31,8 @@ def register_tasks(app: App, config: Config) -> None:
 async def extract_snapshot(
     snapshot: Snapshot,
     fs,
-    config: Config,
+    model: ModelConfig,
+    image: ImageConfig,
     client: OpenAI,
 ) -> Extraction:
     """Extract holder observations from one captured snapshot."""
@@ -55,8 +56,8 @@ async def extract_snapshot(
     extraction = await asyncio.to_thread(
         extract,
         client,
-        config.model,
-        config.image,
+        model,
+        image,
         metadata,
         text,
         screenshot_blob,
@@ -103,7 +104,13 @@ async def run_extraction(config: Config, extraction_id: uuid.UUID) -> None:
                     "capture missing required artifact metadata: " + ", ".join(missing)
                 )
 
-            result = await extract_snapshot(snapshot, fs, config, OpenAI())
+            result = await extract_snapshot(
+                snapshot,
+                fs,
+                ModelConfig(name=extraction.model),
+                config.image,
+                OpenAI(),
+            )
             db.extraction_succeeded(session, extraction, snapshot, result)
             await session.commit()
     finally:
