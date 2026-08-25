@@ -1,4 +1,4 @@
-"""Funes-owned pipeline runs, extractions, and observations."""
+"""Funes-owned extractions and their nested person/position graph."""
 
 import uuid
 from datetime import UTC, datetime
@@ -19,77 +19,35 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 # avoid colliding with the ORM Extraction model below.
 from funes.extract import Extraction as ExtractionResult
 
-EXTRACTION_PENDING = "pending"
-EXTRACTION_SUCCEEDED = "succeeded"
-EXTRACTION_FAILED = "failed"
-
-ERROR_CAPTURE = "capture"
-ERROR_EXTRACT = "extract"
-
 
 class Base(DeclarativeBase):
     pass
 
 
-class Run(Base):
-    """One invocation of the pipeline."""
-
-    __tablename__ = "run"
-
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
-    )
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-    extractions: Mapped[list["Extraction"]] = relationship(
-        back_populates="run", cascade="all, delete-orphan"
-    )
-
-
 class Extraction(Base):
-    """One URL selected for capture and extraction within a run."""
+    """One URL captured and extracted, with its nested result graph."""
 
     __tablename__ = "extraction"
     __table_args__ = (
-        UniqueConstraint("run_id", "url"),
+        UniqueConstraint("url"),
         CheckConstraint(
-            "status IN ('pending', 'succeeded', 'failed')",
-            name="extraction_status",
-        ),
-        CheckConstraint(
-            "(status = 'pending' AND snapshot_id IS NULL AND error_stage IS NULL "
-            "AND error IS NULL AND captured_at IS NULL AND extracted_at IS NULL) OR "
-            "(status = 'succeeded' AND snapshot_id IS NOT NULL "
-            "AND error_stage IS NULL AND error IS NULL AND captured_at IS NOT NULL "
-            "AND extracted_at IS NOT NULL) OR "
-            "(status = 'failed' AND error_stage IS NOT NULL AND error IS NOT NULL "
-            "AND extracted_at IS NULL AND "
-            "((snapshot_id IS NULL AND captured_at IS NULL) OR "
-            "(snapshot_id IS NOT NULL AND captured_at IS NOT NULL)))",
-            name="extraction_outcome",
-        ),
-        CheckConstraint(
-            "error_stage IS NULL OR error_stage IN ('capture', 'extract')",
-            name="extraction_error_stage",
+            "(snapshot_id IS NULL AND captured_at IS NULL AND extracted_at IS NULL) OR "
+            "(snapshot_id IS NOT NULL AND captured_at IS NOT NULL "
+            "AND extracted_at IS NOT NULL)",
+            name="extraction_timestamps",
         ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("run.id", ondelete="CASCADE"))
     url: Mapped[str] = mapped_column(Text)
     model: Mapped[str] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(Text, default=EXTRACTION_PENDING)
     snapshot_id: Mapped[uuid.UUID | None]
-    error_stage: Mapped[str | None] = mapped_column(Text)
-    error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
     captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     extracted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    run: Mapped[Run] = relationship(back_populates="extractions")
     pages: Mapped[list["Page"]] = relationship(
         back_populates="extraction", cascade="all, delete-orphan"
     )
@@ -155,16 +113,11 @@ class Position(Base):
 
 async def register_extractions(
     session: AsyncSession,
-    run: Run,
     associations: list[tuple[str, str, str]],
     model: str,
 ) -> dict[str, Extraction]:
     """Add one extraction per URL and attach all selected input associations."""
-    await session.flush()
-    extractions = {
-        url: Extraction(run_id=run.id, url=url, model=model)
-        for _, url, _ in associations
-    }
+    extractions = {url: Extraction(url=url, model=model) for _, url, _ in associations}
     session.add_all(extractions.values())
     await session.flush()
     session.add_all(
@@ -185,8 +138,6 @@ def extraction_succeeded(
     result: ExtractionResult,
 ) -> None:
     """Store a successful extraction and its nested person/position graph."""
-    _require_pending(extraction)
-    extraction.status = EXTRACTION_SUCCEEDED
     extraction.snapshot_id = snapshot.id
     extraction.captured_at = snapshot.captured_at
     extraction.extracted_at = datetime.now(UTC)
@@ -211,26 +162,3 @@ def extraction_succeeded(
         )
         for person in result.persons
     )
-
-
-def extraction_failed(
-    extraction: Extraction,
-    stage: str,
-    error: str,
-    snapshot: Snapshot | None = None,
-) -> None:
-    """Record a capture or extraction failure."""
-    _require_pending(extraction)
-    if stage not in {ERROR_CAPTURE, ERROR_EXTRACT}:
-        raise ValueError(f"unknown extraction error stage: {stage}")
-    extraction.status = EXTRACTION_FAILED
-    extraction.error_stage = stage
-    extraction.error = error
-    if snapshot is not None:
-        extraction.snapshot_id = snapshot.id
-        extraction.captured_at = snapshot.captured_at
-
-
-def _require_pending(extraction: Extraction) -> None:
-    if extraction.status != EXTRACTION_PENDING:
-        raise ValueError(f"extraction {extraction.id} is already {extraction.status}")
