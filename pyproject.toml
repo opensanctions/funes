@@ -14,6 +14,7 @@ dependencies = [
     "pillow>=12.2.0",
     "procrastinate==3.9.0",
     "psycopg[binary]>=3.3.4",
+    "pydantic-ai-slim[openai]>=2.33,<3",
     "python-dotenv>=1.2.2",
     "sqlalchemy[asyncio]>=2.0.51",
 ]

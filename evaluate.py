@@ -22,6 +22,7 @@ Usage:
     uv run python evaluate.py -v
 """
 
+import asyncio
 import json
 import logging
 import sys
@@ -30,10 +31,16 @@ from pathlib import Path
 
 import click
 from bs4 import BeautifulSoup
-from openai import OpenAI
 
+from funes.capture import split_image
 from funes.config import load_config
-from funes.extract import Extraction, extract, metadata_from_html
+from funes.extract import (
+    _INSTRUCTIONS_WITH_SCREENSHOT,
+    Extraction,
+    build_extraction_agent,
+    metadata_from_html,
+    prompt_content,
+)
 
 log = logging.getLogger("evaluate")
 
@@ -484,23 +491,28 @@ def _print_summary(results: list[FixtureResult]) -> None:
     )
 
 
-def run(fixtures: list[Fixture], verbose: bool) -> None:
+async def run(fixtures: list[Fixture], verbose: bool) -> None:
     """Derive text → extract → flatten → score each fixture, then print a
     per-fixture table and a micro/macro + completeness summary."""
     config = load_config()
-    client = OpenAI()
+    agent = build_extraction_agent(config.model.name)
     results: list[FixtureResult] = []
     for fx in fixtures:
         text = html_to_text(fx.html)
         metadata = metadata_from_html(fx.url, fx.html)
-        extraction = extract(
-            client,
-            config.model,
-            config.image,
-            metadata,
-            text,
-            fx.screenshot,
+        tiles = (
+            split_image(
+                fx.screenshot, config.image.tile_size, config.image.tile_overlap
+            )
+            if fx.screenshot is not None
+            else []
         )
+        prompt = prompt_content(metadata, text, tiles)
+        result = await agent.run(
+            prompt,
+            instructions=_INSTRUCTIONS_WITH_SCREENSHOT if tiles else None,
+        )
+        extraction = result.output
         rows = flatten_persons(extraction)
         actual, duplicates = _index_actual(rows)
         result = _score_fixture(fx, actual, duplicates)
@@ -541,7 +553,7 @@ def run(fixtures: list[Fixture], verbose: bool) -> None:
 def cli(verbose: bool, fixtures_dir: Path) -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stderr)
     fixtures = load_fixtures(Path(fixtures_dir))
-    run(fixtures, verbose)
+    asyncio.run(run(fixtures, verbose))
 
 
 if __name__ == "__main__":

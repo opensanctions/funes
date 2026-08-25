@@ -1,18 +1,30 @@
 """The deferred pipeline task: capture and extract one stored Extraction."""
 
-import asyncio
 import logging
 import uuid
 
-from openai import OpenAI
 from pravda import Snapshot
 from procrastinate import App
+from pydantic_ai import Agent
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from funes import db
-from funes.capture import is_blank, pravda_client, read_artifact, storage_filesystem
-from funes.config import Config, ImageConfig, ModelConfig
-from funes.extract import Extraction, extract, metadata_from_html, screenshot_reason
+from funes.capture import (
+    is_blank,
+    pravda_client,
+    read_artifact,
+    split_image,
+    storage_filesystem,
+)
+from funes.config import Config, ImageConfig
+from funes.extract import (
+    _INSTRUCTIONS_WITH_SCREENSHOT,
+    Extraction,
+    build_extraction_agent,
+    metadata_from_html,
+    prompt_content,
+    screenshot_reason,
+)
 
 log = logging.getLogger("funes")
 
@@ -31,9 +43,9 @@ def register_tasks(app: App, config: Config) -> None:
 async def extract_snapshot(
     snapshot: Snapshot,
     fs,
-    model: ModelConfig,
     image: ImageConfig,
-    client: OpenAI,
+    agent: Agent[None, Extraction],
+    extraction_id: uuid.UUID,
 ) -> Extraction:
     """Extract holder observations from one captured snapshot."""
     text = (await read_artifact(fs, snapshot.plaintext)).decode(
@@ -44,24 +56,22 @@ async def extract_snapshot(
     )
 
     log.info("%s → extracting …", snapshot.url)
-    screenshot_blob = None
+    tiles: list[bytes] = []
     reason = screenshot_reason(text, html)
     if reason is not None:
         log.info("  → %s → including screenshot", reason)
         if snapshot.screenshot is not None:
             blob = await read_artifact(fs, snapshot.screenshot)
             if not is_blank(blob):
-                screenshot_blob = blob
+                tiles = split_image(blob, image.tile_size, image.tile_overlap)
     metadata = metadata_from_html(snapshot.url, html)
-    extraction = await asyncio.to_thread(
-        extract,
-        client,
-        model,
-        image,
-        metadata,
-        text,
-        screenshot_blob,
+    prompt = prompt_content(metadata, text, tiles)
+    result = await agent.run(
+        prompt,
+        run_id=str(extraction_id),
+        instructions=_INSTRUCTIONS_WITH_SCREENSHOT if tiles else None,
     )
+    extraction = result.output
     log.info(
         "%s → %d person(s), %d position(s)",
         snapshot.url,
@@ -107,9 +117,9 @@ async def run_extraction(config: Config, extraction_id: uuid.UUID) -> None:
             result = await extract_snapshot(
                 snapshot,
                 fs,
-                ModelConfig(name=extraction.model),
                 config.image,
-                OpenAI(),
+                build_extraction_agent(extraction.model),
+                extraction_id,
             )
             db.extraction_succeeded(session, extraction, snapshot, result)
             await session.commit()
