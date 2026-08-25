@@ -11,6 +11,7 @@ Early R&D. Currently exploring what a viable automated extraction pipeline looks
 1. Captures snapshots (plaintext + rendered HTML + screenshot) via the in-process Pravda library against a remote browser, Postgres, and an artifact store that Funes owns and runs
 2. Feeds snapshots to an LLM to extract structured "human / position" pairs
 3. Stores queued extractions in PostgreSQL, linked to Pravda snapshot identifiers; each successful extraction stores nested extraction-scoped persons and their positions
+4. Writes each extraction's agent session as a JSONL transcript under `SESSIONS_BASE_PATH`
 
 ## Setup
 
