@@ -24,7 +24,6 @@ from funes.capture import (
 from funes.config import Config
 from funes.extract import (
     _INSTRUCTIONS_WITH_SCREENSHOT,
-    AGENT_NAME,
     build_extraction_agent,
     metadata_from_html,
     prompt_content,
@@ -121,11 +120,6 @@ def build_app(config: Config) -> App:
                 )
                 write_session(
                     session_path(config.sessions.base_path, extraction_id),
-                    {
-                        "agent": AGENT_NAME,
-                        "model": extraction.model,
-                        "extraction_id": extraction_id,
-                    },
                     result.all_messages(),
                 )
                 await session.commit()
