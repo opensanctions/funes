@@ -15,6 +15,10 @@ from sqlalchemy import (
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+# The Pydantic structured-output result from funes.extract, aliased to
+# avoid colliding with the ORM Extraction model below.
+from funes.extract import Extraction as ExtractionResult
+
 EXTRACTION_PENDING = "pending"
 EXTRACTION_SUCCEEDED = "succeeded"
 EXTRACTION_FAILED = "failed"
@@ -89,7 +93,7 @@ class Extraction(Base):
     pages: Mapped[list["Page"]] = relationship(
         back_populates="extraction", cascade="all, delete-orphan"
     )
-    holders: Mapped[list["Holder"]] = relationship(
+    persons: Mapped[list["Person"]] = relationship(
         back_populates="extraction", cascade="all, delete-orphan"
     )
 
@@ -110,27 +114,43 @@ class Page(Base):
     extraction: Mapped[Extraction] = relationship(back_populates="pages")
 
 
-class Holder(Base):
-    """One extracted person-position observation."""
+class Person(Base):
+    """One person observed in an extraction, with person-level facts."""
 
-    __tablename__ = "holder"
+    __tablename__ = "person"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     extraction_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("extraction.id", ondelete="CASCADE")
     )
-    person_name: Mapped[str] = mapped_column(Text)
-    position_name: Mapped[str] = mapped_column(Text)
-    person_dob: Mapped[str | None] = mapped_column(Text)
-    person_bio: Mapped[str | None] = mapped_column(Text)
-    person_countries: Mapped[list[str]] = mapped_column(JSON)
-    position_organization: Mapped[str | None] = mapped_column(Text)
-    position_description: Mapped[str | None] = mapped_column(Text)
-    position_jurisdiction: Mapped[str | None] = mapped_column(Text)
-    position_start_date: Mapped[str | None] = mapped_column(Text)
-    position_end_date: Mapped[str | None] = mapped_column(Text)
+    name: Mapped[str] = mapped_column(Text)
+    dob: Mapped[str | None] = mapped_column(Text)
+    bio: Mapped[str | None] = mapped_column(Text)
+    countries: Mapped[list[str]] = mapped_column(JSON)
 
-    extraction: Mapped[Extraction] = relationship(back_populates="holders")
+    extraction: Mapped[Extraction] = relationship(back_populates="persons")
+    positions: Mapped[list["Position"]] = relationship(
+        back_populates="person", cascade="all, delete-orphan"
+    )
+
+
+class Position(Base):
+    """One position held by a person within an extraction."""
+
+    __tablename__ = "position"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("person.id", ondelete="CASCADE")
+    )
+    name: Mapped[str] = mapped_column(Text)
+    organization: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    jurisdiction: Mapped[str | None] = mapped_column(Text)
+    start_date: Mapped[str | None] = mapped_column(Text)
+    end_date: Mapped[str | None] = mapped_column(Text)
+
+    person: Mapped[Person] = relationship(back_populates="positions")
 
 
 async def register_extractions(
@@ -162,15 +182,35 @@ def extraction_succeeded(
     session: AsyncSession,
     extraction: Extraction,
     snapshot: Snapshot,
-    holders: list[dict],
+    result: ExtractionResult,
 ) -> None:
-    """Store a successful extraction and all of its holder observations."""
+    """Store a successful extraction and its nested person/position graph."""
     _require_pending(extraction)
     extraction.status = EXTRACTION_SUCCEEDED
     extraction.snapshot_id = snapshot.id
     extraction.captured_at = snapshot.captured_at
     extraction.extracted_at = datetime.now(UTC)
-    session.add_all(Holder(extraction_id=extraction.id, **holder) for holder in holders)
+    session.add_all(
+        Person(
+            extraction_id=extraction.id,
+            name=person.name,
+            dob=person.dob,
+            bio=person.bio,
+            countries=person.countries,
+            positions=[
+                Position(
+                    name=position.name,
+                    organization=position.organization,
+                    description=position.description,
+                    jurisdiction=position.jurisdiction,
+                    start_date=position.start_date,
+                    end_date=position.end_date,
+                )
+                for position in person.positions
+            ],
+        )
+        for person in result.persons
+    )
 
 
 def extraction_failed(
