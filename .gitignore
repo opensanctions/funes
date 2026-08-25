@@ -12,5 +12,4 @@ CLAUDE.md
 *.db-journal
 *.log
 *.ftm
-output/
 storage/

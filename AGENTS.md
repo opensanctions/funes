@@ -12,21 +12,20 @@ Funes is an orchestrator that turns raw web pages into structured data about pol
 - **Python** 3.13+ managed by **uv**.
 - **Pravda** ([github.com/opensanctions/pravda](https://github.com/opensanctions/pravda)), published on PyPI as `opensanctions-pravda` (imported as `pravda`), for web page capture and storage, embedded as an in-process async library. Funes owns the infrastructure Pravda connects to — a headed Chrome browser (remote Playwright server), an async Postgres database, and an fsspec artifact store. Connection settings are `PRAVDA_DATABASE_URL`, `PRAVDA_BROWSER_WS_URL`, and `PRAVDA_STORAGE_BASE_PATH` (see `.env`). Funes constructs Pravda's `PravdaConfig` at the CLI boundary, reads artifacts from the shared storage backend over fsspec, and applies Pravda's packaged migrations (`pravda.migrate`) idempotently before the `run` command opens a `Pravda` instance.
 - Development infrastructure is shared. Do not create ad-hoc databases or browsers for tests.
-- Funes persists extraction runs and holder observations in the PostgreSQL database shared with Pravda. JSONL files in `OUTPUT_BASE_PATH` are exports of the latest successful database state.
+- Funes persists extraction runs, each holding nested extraction-scoped persons and positions, in the PostgreSQL database shared with Pravda.
 
 ## Project structure
 
 ```
-funes/           # the package: cli.py (run/export), capture.py
+funes/           # the package: cli.py (run), capture.py
                    # (Pravda client + capture/artifact helpers), extract.py,
-                   # sources.py, export.py, config.py
+                   # sources.py, config.py
 evaluate.py        # score the extraction pipeline against synthetic fixtures
 fixtures/          # one directory per fixture: page.html, expected.json, optional screenshot.png
 ```
 
-`input/` (gitignored) holds the input CSVs (one dataset per file). `output/`
-(gitignored) holds generated exports. Both are fsspec paths set via
-`INPUT_BASE_PATH` / `OUTPUT_BASE_PATH` in `.env`.
+`input/` (gitignored) holds the input CSVs (one dataset per file), an fsspec
+path set via `INPUT_BASE_PATH` in `.env`.
 
 ## Conventions
 
