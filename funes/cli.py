@@ -1,4 +1,4 @@
-"""Command-line interface for the capture, extraction, and output pipeline."""
+"""Command-line interface for the capture and extraction pipeline."""
 
 import asyncio
 import logging
@@ -193,7 +193,7 @@ async def _run_pipeline(
                         )
                         errors.append(OperationalError("extract", url, error))
                         continue
-                    db.extraction_succeeded(session, result, snapshot)
+                    db.extraction_succeeded(session, extraction, snapshot, result)
                     extracted += 1
                     if result.persons:
                         hits += 1
