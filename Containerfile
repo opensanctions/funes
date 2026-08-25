@@ -34,9 +34,8 @@ COPY fixtures ./fixtures
 RUN chown -R app:app /app /opt/venv
 USER app
 
-# INPUT_BASE_PATH points at the CSVs baked into the image; OUTPUT_BASE_PATH
-# and the PRAVDA_* variables must be supplied at runtime (e.g. by the k8s
-# CronJob spec).
+# INPUT_BASE_PATH points at the CSVs baked into the image; the PRAVDA_*
+# variables must be supplied at runtime (e.g. by the k8s CronJob spec).
 ENV INPUT_BASE_PATH=/app/datasets
 
 ENTRYPOINT ["funes"]
