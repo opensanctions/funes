@@ -1,29 +1,27 @@
-"""LLM extraction of position holders from a single page.
+"""LLM extraction of position holders from a single page, via a Pydantic AI
+agent.
 
 Owns the structured-output schema (``Person`` / ``Position`` /
 ``Extraction``), page metadata derivation, the model instructions, the
-text/screenshot decision (``screenshot_reason``), and the ``extract()`` call.
-``screenshot_parts``
-tiles a screenshot blob into model input parts using ``split_image`` from
-:mod:`funes.capture`.
+text/screenshot decision (``screenshot_reason``), the ``Agent`` factory
+(``build_extraction_agent``), and the multimodal prompt parts
+(``prompt_content``) that carry page metadata, text, and tiled screenshot
+images.
 
-The OpenAI client is an explicit argument: it is constructed at the CLI
-boundary, not held as module-global state.
+The agent is built at the application boundary and is reusable across runs;
+it holds no module-global state.
 """
 
-import base64
 import logging
 
 from bs4 import BeautifulSoup
-from openai import OpenAI
 from pydantic import BaseModel, Field
-
-from funes.capture import split_image
-from funes.config import ImageConfig, ModelConfig
+from pydantic_ai import Agent, BinaryContent
 
 log = logging.getLogger("funes")
 
-REASONING_EFFORT = "low"
+AGENT_NAME = "extraction"
+THINKING = "low"
 
 # Content signals that force the full-page screenshot into the model
 # input. Below MIN_TEXT_WORDS the plaintext is too thin to read holders
@@ -236,21 +234,30 @@ class Extraction(BaseModel):
     )
 
 
-def extract(
-    client: OpenAI,
-    model: ModelConfig,
-    image: ImageConfig,
-    metadata: PageMetadata,
-    text: str,
-    screenshot_blob: bytes | None,
-) -> Extraction:
-    """Extract holders from a single page.
+def build_extraction_agent(model_name: str) -> Agent[None, Extraction]:
+    """Build the reusable extraction agent for *model_name*.
 
-    Always sends the page *text*. When the content signals in the caller
-    fire, *screenshot_blob* is tiled and attached as overlapping image
-    parts alongside the text. There is no model-driven tool call: the
-    decision to include the screenshot is made in code from text length
-    and image density, not delegated to the model.
+    Tool-based structured output into ``Extraction``; the agent has no tools
+    and cannot loop. The ``openai:`` prefix resolves to the Responses API.
+    """
+    return Agent(
+        f"openai:{model_name}",
+        name=AGENT_NAME,
+        output_type=Extraction,
+        instructions=_INSTRUCTIONS_HEAD,
+        model_settings={"thinking": THINKING},
+    )
+
+
+def prompt_content(
+    metadata: PageMetadata, text: str, screenshot_tiles: list[bytes]
+) -> list[str | BinaryContent]:
+    """Build the multimodal prompt parts for one page.
+
+    Always includes the page metadata and text source. When the caller
+    supplies screenshot tiles, they are attached as image parts after the
+    text; the caller also passes the run-level screenshot instructions to
+    ``agent.run(...)``, which are additive to the agent's own.
     """
     source = (
         "<page_metadata>\n"
@@ -262,26 +269,11 @@ def extract(
         f"{text}\n"
         "</page_text>"
     )
-    parts: list[dict] = [{"type": "input_text", "text": source}]
-    if screenshot_blob is not None:
-        parts.extend(screenshot_parts(image, screenshot_blob))
-
-    response = client.responses.parse(
-        model=model.name,
-        instructions=_INSTRUCTIONS_HEAD
-        + (_INSTRUCTIONS_WITH_SCREENSHOT if screenshot_blob is not None else ""),
-        input=[{"role": "user", "content": parts}],
-        text_format=Extraction,
-        reasoning={"effort": REASONING_EFFORT},
+    parts: list[str | BinaryContent] = [source]
+    parts.extend(
+        BinaryContent(data=tile, media_type="image/png") for tile in screenshot_tiles
     )
-    extraction = response.output_parsed
-    positions = sum(len(p.positions) for p in extraction.persons)
-    log.info(
-        "  → final: %d person(s), %d position(s)",
-        len(extraction.persons),
-        positions,
-    )
-    return extraction
+    return parts
 
 
 def metadata_from_html(url: str, html: str) -> PageMetadata:
@@ -312,24 +304,6 @@ def metadata_from_html(url: str, html: str) -> PageMetadata:
         title=title or None,
         description=description or None,
     )
-
-
-def screenshot_parts(image: ImageConfig, screenshot_blob: bytes) -> list[dict]:
-    """Tile a full-page screenshot into overlapping input parts for the model."""
-    tiles = split_image(screenshot_blob, image.tile_size, image.tile_overlap)
-    return [
-        {
-            "type": "input_text",
-            "text": "Overlapping tiles of the full-page screenshot follow:",
-        },
-        *[
-            {
-                "type": "input_image",
-                "image_url": "data:image/png;base64," + base64.b64encode(t).decode(),
-            }
-            for t in tiles
-        ],
-    ]
 
 
 def screenshot_reason(text: str, html: str) -> str | None:

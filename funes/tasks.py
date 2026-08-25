@@ -1,24 +1,34 @@
 """Procrastinate wiring: the app factory and the single pipeline task.
 
 ``build_app`` owns both the app and its one task, so the whole pipeline —
-load the Extraction, capture the URL with Pravda, run the model, persist the
-result — reads top to bottom inside the task body. Any failure raises; the
-job simply fails. No retries, no fallback.
+load the Extraction, capture the URL with Pravda, run the extraction agent,
+persist the result — reads top to bottom inside the task body. Any failure
+raises; the job simply fails. No retries, no fallback.
 """
 
-import asyncio
 import logging
 import uuid
 
-from openai import OpenAI
 from procrastinate import App, PsycopgConnector
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from funes import db
-from funes.capture import is_blank, pravda_client, read_artifact, storage_filesystem
-from funes.config import Config, ModelConfig
-from funes.extract import extract, metadata_from_html, screenshot_reason
+from funes.capture import (
+    is_blank,
+    pravda_client,
+    read_artifact,
+    split_image,
+    storage_filesystem,
+)
+from funes.config import Config
+from funes.extract import (
+    _INSTRUCTIONS_WITH_SCREENSHOT,
+    build_extraction_agent,
+    metadata_from_html,
+    prompt_content,
+    screenshot_reason,
+)
 
 log = logging.getLogger("funes")
 
@@ -77,31 +87,36 @@ def build_app(config: Config) -> App:
                 html = (await read_artifact(fs, snapshot.rendered_html)).decode(
                     "utf-8", errors="replace"
                 )
+
                 log.info("%s → extracting …", snapshot.url)
-                screenshot_blob = None
+                tiles: list[bytes] = []
                 reason = screenshot_reason(text, html)
                 if reason is not None:
                     log.info("  → %s → including screenshot", reason)
                     if snapshot.screenshot is not None:
                         blob = await read_artifact(fs, snapshot.screenshot)
                         if not is_blank(blob):
-                            screenshot_blob = blob
-                result = await asyncio.to_thread(
-                    extract,
-                    OpenAI(),
-                    ModelConfig(name=extraction.model),
-                    config.image,
-                    metadata_from_html(snapshot.url, html),
-                    text,
-                    screenshot_blob,
+                            tiles = split_image(
+                                blob,
+                                config.image.tile_size,
+                                config.image.tile_overlap,
+                            )
+                agent = build_extraction_agent(extraction.model)
+                result = await agent.run(
+                    prompt_content(metadata_from_html(snapshot.url, html), text, tiles),
+                    run_id=extraction_id,
+                    instructions=_INSTRUCTIONS_WITH_SCREENSHOT if tiles else None,
                 )
+                extraction_result = result.output
                 log.info(
                     "%s → %d person(s), %d position(s)",
                     snapshot.url,
-                    len(result.persons),
-                    sum(len(p.positions) for p in result.persons),
+                    len(extraction_result.persons),
+                    sum(len(p.positions) for p in extraction_result.persons),
                 )
-                db.extraction_succeeded(session, extraction, snapshot, result)
+                db.extraction_succeeded(
+                    session, extraction, snapshot, extraction_result
+                )
                 await session.commit()
         finally:
             await engine.dispose()
