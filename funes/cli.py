@@ -19,10 +19,7 @@ log = logging.getLogger("funes")
 
 @click.group()
 def cli() -> None:
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
-    root.addHandler(logging.FileHandler("funes.log"))
-    root.addHandler(logging.StreamHandler())
+    logging.basicConfig(level=logging.INFO)
 
 
 @cli.command(help="Apply Pravda's packaged migrations, then Funes's own.")

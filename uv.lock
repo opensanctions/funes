@@ -610,7 +610,7 @@ requires-dist = [
     { name = "openai", specifier = ">=2.41.1" },
     { name = "opensanctions-pravda", specifier = ">=0.1.6" },
     { name = "pillow", specifier = ">=12.2.0" },
-    { name = "procrastinate", specifier = ">=3.9.0" },
+    { name = "procrastinate", specifier = "==3.9.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.51" },

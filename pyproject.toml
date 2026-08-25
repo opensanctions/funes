@@ -12,7 +12,7 @@ dependencies = [
     "openai>=2.41.1",
     "opensanctions-pravda>=0.1.6",
     "pillow>=12.2.0",
-    "procrastinate>=3.9.0",
+    "procrastinate==3.9.0",
     "psycopg[binary]>=3.3.4",
     "python-dotenv>=1.2.2",
     "sqlalchemy[asyncio]>=2.0.51",
