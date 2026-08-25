@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from funes import db
 from funes.config import Config, load_config
 from funes.migrate import migrate
-from funes.queue import QUEUE_PIPELINE, build_app
+from funes.queue import QUEUE_PIPELINE, TASK_PROCESS_EXTRACTION, build_app
 from funes.sources import InputRow, load_inputs
 
 log = logging.getLogger("funes")
@@ -94,7 +94,7 @@ async def _enqueue(
 
             async with app.open_async():
                 await app.configure_task(
-                    "funes.process_extraction", queue=QUEUE_PIPELINE
+                    TASK_PROCESS_EXTRACTION, allow_unknown=False
                 ).batch_defer_async(
                     *(
                         {"extraction_id": str(extraction.id)}

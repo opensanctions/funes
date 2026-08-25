@@ -4,9 +4,9 @@ from procrastinate import App, PsycopgConnector
 from sqlalchemy.engine import make_url
 
 from funes.config import Config
+from funes.tasks import QUEUE_PIPELINE, TASK_PROCESS_EXTRACTION, register_tasks
 
-QUEUE_PIPELINE = "pipeline"
-TASK_PROCESS_EXTRACTION = "funes.process_extraction"
+__all__ = ["QUEUE_PIPELINE", "TASK_PROCESS_EXTRACTION", "build_app", "to_conninfo"]
 
 
 def to_conninfo(database_url: str) -> str:
@@ -18,11 +18,9 @@ def to_conninfo(database_url: str) -> str:
 def build_app(config: Config) -> App:
     """Construct the Procrastinate app with Funes's single explicit task.
 
-    Built from an already-loaded Config so no env vars are read at import
+    Constructed with an already-loaded Config so no env vars are read at import
     time; calling this repeatedly yields equivalent, independent apps.
     """
-    from funes.tasks import register_tasks
-
     app: App = App(
         connector=PsycopgConnector(conninfo=to_conninfo(config.pravda.database_url))
     )

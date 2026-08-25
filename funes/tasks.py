@@ -1,10 +1,12 @@
 """The deferred pipeline task: capture and extract one stored Extraction."""
 
+import asyncio
 import logging
 import uuid
 
 from openai import OpenAI
 from pravda import Snapshot
+from procrastinate import App
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from funes import db
@@ -14,11 +16,14 @@ from funes.extract import Extraction, extract, metadata_from_html, screenshot_re
 
 log = logging.getLogger("funes")
 
+QUEUE_PIPELINE = "pipeline"
+TASK_PROCESS_EXTRACTION = "funes.process_extraction"
 
-def register_tasks(app, config: Config) -> None:
+
+def register_tasks(app: App, config: Config) -> None:
     """Register Funes's tasks on *app*, closing over the loaded *config*."""
 
-    @app.task(name="funes.process_extraction", queue="pipeline")
+    @app.task(name=TASK_PROCESS_EXTRACTION, queue=QUEUE_PIPELINE)
     async def process_extraction(extraction_id: str) -> None:
         await run_extraction(config, uuid.UUID(extraction_id))
 
@@ -47,7 +52,8 @@ async def extract_snapshot(
             if not is_blank(blob):
                 screenshot_blob = blob
     metadata = metadata_from_html(snapshot.url, html)
-    extraction = extract(
+    extraction = await asyncio.to_thread(
+        extract,
         client,
         config.model,
         config.image,
@@ -75,6 +81,7 @@ async def run_extraction(config: Config, extraction_id: uuid.UUID) -> None:
             extraction = await session.get(db.Extraction, extraction_id)
             if extraction is None:
                 raise LookupError(f"extraction {extraction_id} not found")
+            await session.commit()
 
             fs = storage_filesystem(config.pravda)
             pravda = pravda_client(config.pravda)
