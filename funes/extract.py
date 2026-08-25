@@ -75,7 +75,7 @@ there are no valid relationships, return an empty persons list.
    in the title, meta description, page text, or screenshot; never derive it
    from the URL or world knowledge.
 3. Copy names, titles, organisations, nationalities or citizenships, dates,
-   biographies, descriptions, jurisdictions, and evidence in source wording.
+   biographies, descriptions, and jurisdictions in source wording.
    Preserve capitalization, punctuation, and language. For date fields, copy
    the date value itself and omit surrounding words such as "since", "from",
    "until", or "took office".
@@ -102,13 +102,10 @@ there are no valid relationships, return an empty persons list.
    activities.
 9. person.countries contains only explicitly stated nationalities or
    citizenships. Do not use residence, birthplace, or represented country.
-10. Evidence quotes are optional. When supplied, use short source phrases
-    supporting the relationship; they may come from metadata, text, or an
-    attached screenshot, but never from the URL.
-11. Merge repeated mentions of the same holding and combine their details.
+10. Merge repeated mentions of the same holding and combine their details.
     Keep separate Position records when the source explicitly describes
     distinct terms of the same office.
-12. Use null, an empty countries list, or an empty evidence list when the
+11. Use null or an empty countries list when the
     corresponding value is not stated. Never fill gaps from world knowledge.
 
 # Examples
@@ -173,14 +170,6 @@ class PageMetadata(BaseModel):
 # flat (one row per person-position), so ``flatten_persons`` is the single
 # boundary that owns the nested→flat mapping.
 class Position(BaseModel):
-    evidence_quotes: list[str] = Field(
-        default_factory=list,
-        description=(
-            "Optional short source phrases supporting this person-position "
-            "relationship. They may be copied from page metadata, body text, "
-            "or a screenshot, but not inferred from the URL."
-        ),
-    )
     name: str = Field(
         min_length=1,
         description=(
@@ -271,7 +260,6 @@ def flatten_persons(extraction: Extraction) -> list[dict]:
                     "position_jurisdiction": position.jurisdiction,
                     "position_start_date": position.start_date,
                     "position_end_date": position.end_date,
-                    "evidence_quotes": position.evidence_quotes,
                 }
             )
     return rows

@@ -12,12 +12,12 @@ Funes is an orchestrator that turns raw web pages into structured data about pol
 - **Python** 3.13+ managed by **uv**.
 - **Pravda** ([github.com/opensanctions/pravda](https://github.com/opensanctions/pravda)), published on PyPI as `opensanctions-pravda` (imported as `pravda`), for web page capture and storage, embedded as an in-process async library. Funes owns the infrastructure Pravda connects to — a headed Chrome browser (remote Playwright server), an async Postgres database, and an fsspec artifact store. Connection settings are `PRAVDA_DATABASE_URL`, `PRAVDA_BROWSER_WS_URL`, and `PRAVDA_STORAGE_BASE_PATH` (see `.env`). Funes constructs Pravda's `PravdaConfig` at the CLI boundary, reads artifacts from the shared storage backend over fsspec, and applies Pravda's packaged migrations (`pravda.migrate`) idempotently before the `run` command opens a `Pravda` instance.
 - Development infrastructure is shared. Do not create ad-hoc databases or browsers for tests.
-- Funes does not persist extraction results. Each `run` writes only that run's records as JSONL to `OUTPUT_BASE_PATH`; PostgreSQL is used only by Pravda.
+- Funes persists extraction runs and holder observations in the PostgreSQL database shared with Pravda. JSONL files in `OUTPUT_BASE_PATH` are exports of the latest successful database state.
 
 ## Project structure
 
 ```
-funes/           # the package: cli.py (run), capture.py
+funes/           # the package: cli.py (run/export), capture.py
                    # (Pravda client + capture/artifact helpers), extract.py,
                    # sources.py, export.py, config.py
 evaluate.py        # score the extraction pipeline against synthetic fixtures
