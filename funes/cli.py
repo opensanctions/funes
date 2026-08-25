@@ -3,11 +3,17 @@
 import asyncio
 import logging
 import random
+import uuid
+from datetime import UTC, datetime
 
 import click
-from openai import OpenAI
-from pravda import Snapshot, migrate
+from openai import OpenAI, OpenAIError
+from pravda import Snapshot
+from pravda import migrate as pravda_migrate
+from pydantic import ValidationError
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from funes import db
 from funes.capture import (
     OperationalError,
     capture_urls,
@@ -25,6 +31,7 @@ from funes.extract import (
     metadata_from_html,
     screenshot_reason,
 )
+from funes.migrate import migrate
 from funes.sources import InputRow, load_inputs
 
 log = logging.getLogger("funes")
@@ -45,10 +52,10 @@ async def extract_snapshot(
     client: OpenAI,
 ) -> list[dict]:
     """Extract flattened holder observations from one captured snapshot."""
-    text = (await read_artifact(fs, snapshot, snapshot.plaintext)).decode(
+    text = (await read_artifact(fs, snapshot.plaintext)).decode(
         "utf-8", errors="replace"
     )
-    html = (await read_artifact(fs, snapshot, snapshot.rendered_html)).decode(
+    html = (await read_artifact(fs, snapshot.rendered_html)).decode(
         "utf-8", errors="replace"
     )
 
@@ -58,7 +65,7 @@ async def extract_snapshot(
     if reason is not None:
         log.info("  → %s → including screenshot", reason)
         if snapshot.screenshot is not None:
-            blob = await read_artifact(fs, snapshot, snapshot.screenshot)
+            blob = await read_artifact(fs, snapshot.screenshot)
             if not is_blank(blob):
                 screenshot_blob = blob
     metadata = metadata_from_html(snapshot.url, html)
@@ -82,7 +89,8 @@ async def run_pipeline(
     config: Config,
     client: OpenAI,
 ) -> None:
-    """Apply Pravda migrations, then capture, extract, and write this run."""
+    """Apply migrations, then capture, extract, and write this run."""
+    await pravda_migrate(config.pravda.database_url)
     await migrate(config.pravda.database_url)
     await _run_pipeline(inputs, sample, concurrency, config, client)
 
@@ -94,14 +102,7 @@ async def _run_pipeline(
     config: Config,
     client: OpenAI,
 ) -> None:
-    """Capture and extract selected inputs, then write only these results.
-
-    A URL repeated within a dataset collapses to one page association. The
-    same URL in several datasets remains several associations, backed by one
-    Pravda capture. Sampling happens over associations before capture.
-    Funes keeps no database state of its own; Pravda alone persists the
-    captured evidence.
-    """
+    """Persist, capture, and extract the selected input associations."""
     associations: list[tuple[str, str, str]] = []
     seen: set[tuple[str, str]] = set()
     for dataset, rows in inputs:
@@ -119,65 +120,88 @@ async def _run_pipeline(
     urls = sorted({url for _, url, _ in associations})
     log.info("%d unique URL(s) to snapshot", len(urls))
 
-    # Replace the output for every loaded dataset, including those with no
-    # sampled pages, successful captures, or extracted holders.
-    groups: dict[str, list[dict]] = {dataset: [] for dataset, _ in inputs}
-    fs = storage_filesystem(config.pravda)
-    pravda = pravda_client(config.pravda)
-    async with pravda:
-        captures, errors = await capture_urls(pravda, urls, concurrency)
+    engine = create_async_engine(config.pravda.database_url)
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+            run = db.Run(id=uuid.uuid4())
+            session.add(run)
+            captures = await db.register_pages(session, run, associations)
+            await session.commit()
+            log.info("run %s: %d capture(s)", run.id, len(captures))
 
-        extracted = 0
-        hits = 0
-        for dataset, url, organization in associations:
-            snapshot = captures.get(url)
-            if snapshot is None:
-                # Operational capture failure: already logged and counted in
-                # `errors`; keep going rather than abort the run.
-                continue
-            if snapshot.error is not None:
-                log.warning("  skip %s — capture failed: %s", url, snapshot.error)
-                continue
-            missing = [
-                name
-                for name, value in (
-                    ("storage prefix", snapshot.prefix),
-                    ("plaintext", snapshot.plaintext),
-                    ("rendered HTML", snapshot.rendered_html),
-                )
-                if value is None
-            ]
-            if missing:
-                log.warning(
-                    "  skip %s — capture missing required artifact metadata: %s",
-                    url,
-                    ", ".join(missing),
-                )
-                continue
+            groups: dict[str, list[dict]] = {dataset: [] for dataset, _ in inputs}
+            fs = storage_filesystem(config.pravda)
+            pravda = pravda_client(config.pravda)
+            async with pravda:
+                snapshots, errors = await capture_urls(pravda, urls, concurrency)
+                operational_errors = {error.url: error.error for error in errors}
+                for url, capture in captures.items():
+                    snapshot = snapshots.get(url)
+                    if snapshot is None:
+                        db.capture_failed(capture, operational_errors[url])
+                    elif snapshot.error is not None:
+                        db.capture_failed(capture, snapshot.error, snapshot)
+                    else:
+                        db.capture_succeeded(capture, snapshot)
+                await session.commit()
 
-            try:
-                holders = await extract_snapshot(snapshot, fs, config, client)
-            except Exception as exc:
-                # One page's extraction failing (LLM/parse/IO) must not abort
-                # the run; log, count, and move on.
-                log.warning(
-                    "  extraction failed for %s: %s: %s", url, type(exc).__name__, exc
-                )
-                errors.append(
-                    OperationalError("extract", url, f"{type(exc).__name__}: {exc}")
-                )
-                continue
-            groups[dataset].extend(
-                holder_to_record(dataset, url, organization, snapshot, holder)
-                for holder in holders
-            )
-            extracted += 1
-            if holders:
-                hits += 1
+                extracted = 0
+                hits = 0
+                for dataset, url, organization in associations:
+                    snapshot = snapshots.get(url)
+                    if snapshot is None:
+                        continue
+                    if snapshot.error is not None:
+                        log.warning(
+                            "  skip %s — capture failed: %s", url, snapshot.error
+                        )
+                        continue
+                    missing = [
+                        name
+                        for name, value in (
+                            ("plaintext", snapshot.plaintext),
+                            ("rendered HTML", snapshot.rendered_html),
+                        )
+                        if value is None
+                    ]
+                    if missing:
+                        log.warning(
+                            "  skip %s — capture missing required artifact metadata: %s",
+                            url,
+                            ", ".join(missing),
+                        )
+                        continue
 
-    await write_outputs(groups, config.paths)
-    log.info("extraction: %d hit, %d miss", hits, extracted - hits)
-    summarise_errors(errors)
+                    try:
+                        holders = await extract_snapshot(snapshot, fs, config, client)
+                    except (OpenAIError, OSError, ValidationError) as exc:
+                        log.warning(
+                            "  extraction failed for %s: %s: %s",
+                            url,
+                            type(exc).__name__,
+                            exc,
+                        )
+                        errors.append(
+                            OperationalError(
+                                "extract", url, f"{type(exc).__name__}: {exc}"
+                            )
+                        )
+                        continue
+                    groups[dataset].extend(
+                        holder_to_record(dataset, url, organization, snapshot, holder)
+                        for holder in holders
+                    )
+                    extracted += 1
+                    if holders:
+                        hits += 1
+
+            await write_outputs(groups, config.paths)
+            run.finished_at = datetime.now(UTC)
+            await session.commit()
+            log.info("extraction: %d hit, %d miss", hits, extracted - hits)
+            summarise_errors(errors)
+    finally:
+        await engine.dispose()
 
 
 @cli.command(

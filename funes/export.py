@@ -3,7 +3,7 @@
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 
 import fsspec
 from fsspec.implementations.asyn_wrapper import AsyncFileSystemWrapper
@@ -63,7 +63,7 @@ async def write_outputs(groups: dict[str, list[dict]], paths: PathsConfig) -> No
     if not fs.async_impl:
         # Consistently use async API on pipeline's event loop
         fs = AsyncFileSystemWrapper(fs)
-    date = datetime.now().strftime(EXPORT_DATE_FORMAT)
+    date = datetime.now(UTC).strftime(EXPORT_DATE_FORMAT)
     total = 0
     for dataset, records in groups.items():
         out_dir = os.path.join(base, dataset)

@@ -1,0 +1,1 @@
+"""Packaged Funes database migrations."""

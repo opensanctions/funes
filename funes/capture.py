@@ -15,7 +15,6 @@ it never speaks HTTP to Pravda.
 import asyncio
 import io
 import logging
-import os
 from collections import Counter
 from dataclasses import dataclass
 
@@ -46,8 +45,9 @@ def pravda_client(settings: PravdaSettings) -> Pravda:
 def storage_filesystem(settings: PravdaSettings):
     """The shared fsspec backend Pravda writes artifacts to.
 
-    Pravda resolves each snapshot's ``prefix`` against this same base path, so
-    opening ``<prefix>/<filename>`` on this filesystem locates the artifact for
+    Pravda resolves each snapshot's artifact fields to full storage paths
+    against this same base path, so catting the resolved path on this
+    filesystem locates the artifact for
     both local paths and remote (``gs://``/``s3://``) URLs.
 
     Synchronous backends (e.g. the local filesystem) are wrapped so reads use
@@ -64,23 +64,18 @@ def storage_filesystem(settings: PravdaSettings):
     return fs
 
 
-async def read_artifact(fs, snapshot: Snapshot, filename: str | None) -> bytes:
+async def read_artifact(fs, path: str) -> bytes:
     """Read a snapshot artifact blob from the shared storage backend.
 
-    ``snapshot.prefix`` is the backend-resolved directory (base path plus the
-    normalized host of ``final_url``); *filename* is the bare
-    content-addressed name Pravda stored. Both are required for a stored
-    artifact: a missing one is a malformed snapshot, so this fails loud rather
-    than returning empty bytes.
+    Since Pravda 0.1.4, ``Snapshot.plaintext`` / ``rendered_html`` /
+    ``screenshot`` are full storage paths resolved against the shared base
+    path, so *path* is opened as-is. Callers skip snapshots whose artifact
+    fields are missing; a path reaching here is expected to exist, and a
+    missing file fails loud rather than returning empty bytes.
 
     Reads through the async API on the current event loop; see
     ``storage_filesystem`` for why the sync ``fs.open`` path is avoided.
     """
-    if snapshot.prefix is None:
-        raise ValueError(f"snapshot {snapshot.id} has no storage prefix")
-    if filename is None:
-        raise ValueError(f"snapshot {snapshot.id} has no artifact filename")
-    path = os.path.join(snapshot.prefix, filename)
     return await fs._cat_file(path)
 
 
@@ -185,28 +180,22 @@ async def capture_urls(
     instead, so one such failure cannot abort the whole run.
     """
     sem = asyncio.Semaphore(concurrency)
+
+    async def snap(url: str) -> Snapshot:
+        async with sem:
+            return await pravda.snapshot(url)
+
+    results = await asyncio.gather(*(snap(url) for url in urls), return_exceptions=True)
     captures: dict[str, Snapshot] = {}
     errors: list[OperationalError] = []
-
-    async def snap(url: str) -> None:
-        async with sem:
-            try:
-                snapshot = await pravda.snapshot(url)
-            except Exception as exc:
-                # Never abort the run for one URL. CancelledError /
-                # KeyboardInterrupt are BaseException and still propagate.
-                log.warning(
-                    "capture failed operationally for %s: %s: %s",
-                    url,
-                    type(exc).__name__,
-                    exc,
-                )
-                errors.append(
-                    OperationalError("capture", url, f"{type(exc).__name__}: {exc}")
-                )
-                return
-            log.info("snapshotted %s has_error=%s", snapshot.url, snapshot.error is not None)
-            captures[url] = snapshot
-
-    await asyncio.gather(*(snap(url) for url in urls))
+    for url, result in zip(urls, results, strict=True):
+        if isinstance(result, BaseException):
+            if not isinstance(result, Exception):
+                raise result
+            message = f"{type(result).__name__}: {result}"
+            log.warning("capture failed operationally for %s: %s", url, message)
+            errors.append(OperationalError("capture", url, message))
+            continue
+        log.info("snapshotted %s has_error=%s", result.url, result.error is not None)
+        captures[url] = result
     return captures, errors
