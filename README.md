@@ -20,14 +20,10 @@ Requires uv. Funes embeds Pravda as an async library and
 owns the infrastructure Pravda connects to: a headed Chrome browser, a
 Postgres database, and an artifact store. Pravda ships on PyPI as
 `opensanctions-pravda` (imported as `pravda`); `uv sync` installs it.
-Bring the infrastructure up with Docker Compose:
 
 ```bash
 # Install dependencies
 uv sync
-
-# Start the browser (Playwright run-server) and Postgres
-docker compose up -d
 ```
 
 The `run` command applies Pravda's packaged Alembic migrations idempotently before use, so no separate migration step is needed.

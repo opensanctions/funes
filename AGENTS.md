@@ -10,8 +10,8 @@ Funes is an orchestrator that turns raw web pages into structured data about pol
 ## Stack
 
 - **Python** 3.13+ managed by **uv**.
-- **Pravda** ([github.com/opensanctions/pravda](https://github.com/opensanctions/pravda)), published on PyPI as `opensanctions-pravda` (imported as `pravda`), for web page capture and storage, embedded as an in-process async library. Funes owns the infrastructure Pravda connects to — a headed Chrome browser (remote Playwright server), an async Postgres database, and an fsspec artifact store — defined in `compose.yaml`, with optional rootless systemd units under `quadlet/`. Connection settings are `PRAVDA_DATABASE_URL`, `PRAVDA_BROWSER_WS_URL`, and `PRAVDA_STORAGE_BASE_PATH` (see `.env`). Funes constructs Pravda's `PravdaConfig` at the CLI boundary, reads artifacts from the shared storage backend over fsspec, and applies Pravda's packaged migrations (`pravda.migrate`) idempotently before the `run` command opens a `Pravda` instance.
-- Development infrastructure is shared. Use the existing Compose or Quadlet stack; do not create ad-hoc database or browser containers for tests.
+- **Pravda** ([github.com/opensanctions/pravda](https://github.com/opensanctions/pravda)), published on PyPI as `opensanctions-pravda` (imported as `pravda`), for web page capture and storage, embedded as an in-process async library. Funes owns the infrastructure Pravda connects to — a headed Chrome browser (remote Playwright server), an async Postgres database, and an fsspec artifact store. Connection settings are `PRAVDA_DATABASE_URL`, `PRAVDA_BROWSER_WS_URL`, and `PRAVDA_STORAGE_BASE_PATH` (see `.env`). Funes constructs Pravda's `PravdaConfig` at the CLI boundary, reads artifacts from the shared storage backend over fsspec, and applies Pravda's packaged migrations (`pravda.migrate`) idempotently before the `run` command opens a `Pravda` instance.
+- Development infrastructure is shared. Do not create ad-hoc databases or browsers for tests.
 - Funes does not persist extraction results. Each `run` writes only that run's records as JSONL to `OUTPUT_BASE_PATH`; PostgreSQL is used only by Pravda.
 
 ## Project structure
@@ -22,8 +22,6 @@ funes/           # the package: cli.py (run), capture.py
                    # sources.py, export.py, config.py
 evaluate.py        # score the extraction pipeline against synthetic fixtures
 fixtures/          # one directory per fixture: page.html, expected.json, optional screenshot.png
-compose.yaml      # portable browser + Postgres development stack
-quadlet/          # optional rootless systemd definitions for the same stack
 ```
 
 `input/` (gitignored) holds the input CSVs (one dataset per file). `output/`
