@@ -9,8 +9,7 @@ answer key.
 Every expected holder states the complete flat schema. A holding is keyed by
 person, title, organisation, start date, and end date so distinct terms of the
 same office remain separate. The remaining person and position fields are
-compared on matched holdings. Evidence quotes remain part of production output
-but are deliberately outside evaluation scope for now. Duplicate observations
+compared on matched holdings. Duplicate observations
 are reported rather than silently collapsed, and empty agreement scores as
 perfect.
 
