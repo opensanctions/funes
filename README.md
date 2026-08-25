@@ -24,7 +24,37 @@ Postgres database, and an artifact store. Pravda ships on PyPI as
 uv sync
 ```
 
-The `run` command applies both Pravda's and Funes's packaged Alembic migrations idempotently before use, so no separate migration step is needed.
+Bring up the shared infrastructure (Postgres and the headed Chrome that
+Pravda drives) with:
+
+```bash
+docker compose up -d
+```
+
+## Migrations
+
+Migrations are a **release step, not an app-startup step**: run `funes
+migrate` once per deploy, before starting any `funes run`, `funes enqueue`,
+or `funes worker` process.
+
+```bash
+uv run funes migrate
+```
+
+`funes migrate` applies two independent Alembic ledgers to the shared
+Postgres database:
+
+- **Pravda's own ledger** ships with the `opensanctions-pravda` package and
+  is applied as-is.
+- **Funes's ledger** (`funes/migrations/`) tracks Funes's tables *and* the
+  Procrastinate job-queue schema. Procrastinate ships no migration ledger
+  of its own — only a full-schema SQL file — so Funes's Alembic tracks it on
+  Procrastinate's behalf. Revision `0002` installs the exact schema for the
+  pinned Procrastinate version from an immutable vendored copy
+  (`funes/migrations/sql/procrastinate_schema_3.9.0.sql`, byte-identical to
+  `procrastinate/sql/schema.sql` at pin time). Bumping Procrastinate means
+  vendoring the new schema file and adding a new Funes revision; historical
+  revisions never read the installed package.
 
 ## Usage
 
@@ -40,6 +70,15 @@ uv run funes run
 uv run funes run -d hio_leadership   # one dataset only
 uv run funes run -n 20               # random sample of 20 page inputs
 uv run funes run -c 10               # up to 10 concurrent captures
+```
+
+Work is queued through [Procrastinate](https://procrastinate.readthedocs.io/),
+a Postgres-backed job queue that reuses the same database (no new
+environment variables — it connects through `PRAVDA_DATABASE_URL`):
+
+```bash
+uv run funes enqueue  # defer capture/extraction jobs from the input CSVs
+uv run funes worker   # run a worker that executes queued jobs
 ```
 
 ## Evaluation
