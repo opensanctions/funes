@@ -18,11 +18,6 @@ class InputRow(BaseModel):
     url: str
 
 
-def dataset_name(path: str) -> str:
-    """Dataset name derived from the input CSV's filename stem."""
-    return os.path.splitext(os.path.basename(path))[0]
-
-
 def load_inputs(base_path: str) -> list[tuple[str, list[InputRow]]]:
     """Load every CSV under the input directory as a (dataset, rows) pair.
 
@@ -44,5 +39,6 @@ def load_inputs(base_path: str) -> list[tuple[str, list[InputRow]]]:
                 for row in reader
                 if row["url"].strip()
             ]
-        result.append((dataset_name(path), rows))
+        # Each CSV is its own dataset, named after the file's stem.
+        result.append((os.path.splitext(os.path.basename(path))[0], rows))
     return result

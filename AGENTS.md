@@ -17,9 +17,10 @@ Funes is an orchestrator that turns raw web pages into structured data about pol
 ## Project structure
 
 ```
-funes/           # the package: cli.py (migrate, enqueue, worker), queue.py,
-                   # tasks.py, capture.py (Pravda client + artifact helpers),
-                   # extract.py, sources.py, config.py
+funes/           # the package: cli.py (migrate, enqueue, worker), tasks.py
+                   # (Procrastinate app + pipeline task), capture.py (Pravda
+                   # client + artifact helpers), extract.py, db.py, sources.py,
+                   # config.py
 evaluate.py        # score the extraction pipeline against synthetic fixtures
 fixtures/          # one directory per fixture: page.html, expected.json, optional screenshot.png
 ```

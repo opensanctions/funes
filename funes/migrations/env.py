@@ -9,7 +9,6 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from funes.db import Base
-from funes.migrate import VERSION_TABLE
 
 config = context.config
 
@@ -32,7 +31,7 @@ def run_migrations(connection: Connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=Base.metadata,
-        version_table=VERSION_TABLE,
+        version_table="funes_alembic_version",
         include_name=include_funes_name,
     )
     with context.begin_transaction():

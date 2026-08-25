@@ -5,9 +5,9 @@
 - ``is_blank`` / ``split_image`` are image primitives over a screenshot blob
   (shared by capture and the extraction tiling path).
 
-Pravda is an in-process async library. Funes constructs one ``Pravda``
-instance from its environment-backed settings and reuses it across captures;
-it never speaks HTTP to Pravda.
+Pravda is an in-process async library. Funes constructs a ``Pravda``
+instance from its environment-backed settings for each capture; it never
+speaks HTTP to Pravda.
 """
 
 import io

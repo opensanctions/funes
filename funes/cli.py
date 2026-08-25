@@ -9,10 +9,10 @@ from pravda import migrate as pravda_migrate
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from funes import db
-from funes.config import Config, load_config
+from funes.config import load_config
 from funes.migrate import migrate
-from funes.queue import QUEUE_PIPELINE, TASK_PROCESS_EXTRACTION, build_app
-from funes.sources import InputRow, load_inputs
+from funes.sources import load_inputs
+from funes.tasks import QUEUE_PIPELINE, TASK_PROCESS_EXTRACTION, build_app
 
 log = logging.getLogger("funes")
 
@@ -24,13 +24,9 @@ def cli() -> None:
 
 @cli.command(help="Apply Pravda's packaged migrations, then Funes's own.")
 def migrate_cmd() -> None:
-    config = load_config()
-    asyncio.run(_migrate(config))
-
-
-async def _migrate(config: Config) -> None:
-    await pravda_migrate(config.pravda.database_url)
-    await migrate(config.pravda.database_url)
+    database_url = load_config().pravda.database_url
+    asyncio.run(pravda_migrate(database_url))
+    asyncio.run(migrate(database_url))
 
 
 @cli.command(
@@ -54,53 +50,49 @@ def enqueue_cmd(dataset: str | None, sample: int | None) -> None:
     if dataset is not None:
         inputs = [(d, rows) for d, rows in inputs if d == dataset]
     log.info("%d input CSV(s)", len(inputs))
-    for dataset_name, rows in inputs:
-        log.info("dataset %s: %d row(s)", dataset_name, len(rows))
-    asyncio.run(_enqueue(inputs, sample, config))
+    for name, rows in inputs:
+        log.info("dataset %s: %d row(s)", name, len(rows))
 
+    async def enqueue() -> None:
+        """Persist the selected associations and queue one job per Extraction."""
+        associations: list[tuple[str, str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for name, rows in inputs:
+            for row in rows:
+                key = (name, row.url)
+                if key in seen:
+                    continue
+                seen.add(key)
+                associations.append((name, row.url, row.organization))
 
-async def _enqueue(
-    inputs: list[tuple[str, list[InputRow]]],
-    sample: int | None,
-    config: Config,
-) -> None:
-    """Persist the selected associations and queue one job per Extraction."""
-    associations: list[tuple[str, str, str]] = []
-    seen: set[tuple[str, str]] = set()
-    for dataset, rows in inputs:
-        for row in rows:
-            key = (dataset, row.url)
-            if key in seen:
-                continue
-            seen.add(key)
-            associations.append((dataset, row.url, row.organization))
+        if sample is not None and sample < len(associations):
+            associations = random.sample(associations, sample)
+        log.info("%d page association(s) selected", len(associations))
 
-    if sample is not None and sample < len(associations):
-        associations = random.sample(associations, sample)
-    log.info("%d page association(s) selected", len(associations))
-
-    app = build_app(config)
-    engine = create_async_engine(config.pravda.database_url)
-    try:
-        async with async_sessionmaker(engine, expire_on_commit=False)() as session:
-            extractions = await db.register_extractions(
-                session, associations, config.model.name
-            )
-            await session.commit()
-            log.info("%d extraction(s) registered", len(extractions))
-
-            async with app.open_async():
-                await app.configure_task(
-                    TASK_PROCESS_EXTRACTION, allow_unknown=False
-                ).batch_defer_async(
-                    *(
-                        {"extraction_id": str(extraction.id)}
-                        for extraction in extractions.values()
-                    )
+        app = build_app(config)
+        engine = create_async_engine(config.pravda.database_url)
+        try:
+            async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+                extractions = await db.register_extractions(
+                    session, associations, config.model.name
                 )
-            log.info("%d job(s) queued", len(extractions))
-    finally:
-        await engine.dispose()
+                await session.commit()
+                log.info("%d extraction(s) registered", len(extractions))
+
+                async with app.open_async():
+                    await app.configure_task(
+                        TASK_PROCESS_EXTRACTION, allow_unknown=False
+                    ).batch_defer_async(
+                        *(
+                            {"extraction_id": str(extraction.id)}
+                            for extraction in extractions.values()
+                        )
+                    )
+                log.info("%d job(s) queued", len(extractions))
+        finally:
+            await engine.dispose()
+
+    asyncio.run(enqueue())
 
 
 @cli.command(
