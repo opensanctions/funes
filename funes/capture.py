@@ -1,7 +1,5 @@
 """Pravda integration and screenshot artifacts.
 
-- ``capture_urls`` captures each URL once, concurrently, through one
-  long-lived Pravda instance (bounded by a semaphore).
 - ``read_artifact`` reads a snapshot artifact blob from the shared fsspec
   storage backend Funes and Pravda both use.
 - ``is_blank`` / ``split_image`` are image primitives over a screenshot blob
@@ -12,20 +10,14 @@ instance from its environment-backed settings and reuses it across captures;
 it never speaks HTTP to Pravda.
 """
 
-import asyncio
 import io
-import logging
-from collections import Counter
-from dataclasses import dataclass
 
 import fsspec
 from fsspec.implementations.asyn_wrapper import AsyncFileSystemWrapper
 from PIL import Image
-from pravda import Pravda, PravdaConfig, Snapshot
+from pravda import Pravda, PravdaConfig
 
 from funes.config import PravdaSettings
-
-log = logging.getLogger("funes")
 
 
 def pravda_client(settings: PravdaSettings) -> Pravda:
@@ -126,76 +118,3 @@ def split_image(blob: bytes, tile: int, overlap: float) -> list[bytes]:
         crop.save(buf, format="PNG")
         tiles.append(buf.getvalue())
     return tiles
-
-
-@dataclass
-class OperationalError:
-    """A per-URL failure that must not abort the whole run.
-
-    Distinct from the capture failures Pravda *persists* on a snapshot with
-    ``error`` set (HTTP status, browser/context failures): those come back as
-    an errored Snapshot and are recorded in the database. An
-    ``OperationalError`` is one Pravda *raises* instead — e.g. an inner HAR
-    processing or storage timeout, which Pravda's own code notes is an
-    operational error rather than persisted evidence. We gather these, count
-    them, and let the run finish; they belong in the log, not the database.
-    """
-
-    stage: str
-    url: str
-    error: str
-
-
-def summarise_errors(errors: list[OperationalError]) -> None:
-    """Log a summary of the operational errors gathered during the run."""
-    if not errors:
-        log.info("operational errors: none")
-        return
-    by_stage = Counter(e.stage for e in errors)
-    by_type = Counter(e.error.split(":", 1)[0] for e in errors)
-    log.warning(
-        "operational errors: %d across %d URL(s) — by stage: %s",
-        len(errors),
-        len({e.url for e in errors}),
-        ", ".join(f"{stage}={n}" for stage, n in by_stage.most_common()),
-    )
-    for etype, count in by_type.most_common():
-        log.warning("  %s: %d", etype, count)
-    for error in errors:
-        log.warning("  [%s] %s — %s", error.stage, error.url, error.error)
-
-
-async def capture_urls(
-    pravda: Pravda, urls: list[str], concurrency: int
-) -> tuple[dict[str, Snapshot], list[OperationalError]]:
-    """Capture each URL once, concurrently, through one Pravda instance.
-
-    At most *concurrency* captures run at once (an ``asyncio.Semaphore``
-    bounds them); each is otherwise independent. Returns a mapping of the
-    requested URL to the Snapshot Pravda persisted for it, plus a list of
-    operational errors. Pravda persists capture failures with ``error`` set
-    rather than raising, so those still appear in the mapping as errored
-    snapshots. A URL that Pravda fails *operationally* (raising, e.g. a HAR
-    timeout) is absent from the mapping and recorded as an ``OperationalError``
-    instead, so one such failure cannot abort the whole run.
-    """
-    sem = asyncio.Semaphore(concurrency)
-
-    async def snap(url: str) -> Snapshot:
-        async with sem:
-            return await pravda.snapshot(url)
-
-    results = await asyncio.gather(*(snap(url) for url in urls), return_exceptions=True)
-    captures: dict[str, Snapshot] = {}
-    errors: list[OperationalError] = []
-    for url, result in zip(urls, results, strict=True):
-        if isinstance(result, BaseException):
-            if not isinstance(result, Exception):
-                raise result
-            message = f"{type(result).__name__}: {result}"
-            log.warning("capture failed operationally for %s: %s", url, message)
-            errors.append(OperationalError("capture", url, message))
-            continue
-        log.info("snapshotted %s has_error=%s", result.url, result.error is not None)
-        captures[url] = result
-    return captures, errors
