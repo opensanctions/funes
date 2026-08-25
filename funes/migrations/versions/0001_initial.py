@@ -33,7 +33,6 @@ def upgrade() -> None:
             name="extraction_timestamps",
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("url"),
     )
     op.create_table(
         "page",

@@ -25,11 +25,10 @@ class Base(DeclarativeBase):
 
 
 class Extraction(Base):
-    """One URL captured and extracted, with its nested result graph."""
+    """One URL selected for capture and extraction, with its result graph."""
 
     __tablename__ = "extraction"
     __table_args__ = (
-        UniqueConstraint("url"),
         CheckConstraint(
             "(snapshot_id IS NULL AND captured_at IS NULL AND extracted_at IS NULL) OR "
             "(snapshot_id IS NOT NULL AND captured_at IS NOT NULL "
