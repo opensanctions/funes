@@ -1,0 +1,29 @@
+# Pravda's headed-Chrome image (Chrome under xvfb exposed as a remote
+# Playwright WebSocket server), published on localhost:3000.
+#
+# Pinned to 0.1.5 to match the opensanctions-pravda version pinned in
+# pyproject.toml (>=0.1.5), so the bundled Playwright server version matches
+# the client pulled in transitively through that package.
+[Unit]
+Description=Funes: Pravda headed-Chrome Playwright server
+
+[Container]
+Image=ghcr.io/opensanctions/pravda-browser:0.1.5
+ContainerName=funes-browser
+PublishPort=127.0.0.1:3000:3000
+# PID 1 signal handling, like `init: true` in the old compose file.
+RunInit=true
+# Playwright's server exposes an HTTP /json listing of its browser endpoints;
+# it answers only once the WebSocket server accepts connections, so this
+# doubles as a readiness endpoint for clients.
+HealthCmd=curl -f http://localhost:3000/json
+HealthInterval=10s
+HealthTimeout=5s
+HealthRetries=5
+
+[Service]
+# The first start must pull the image, which can exceed systemd's 90s default.
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

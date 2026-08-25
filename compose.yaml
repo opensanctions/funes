@@ -16,12 +16,12 @@ services:
     # Headed Chrome under xvfb, exposed as a remote Playwright WebSocket
     # server on port 3000. Published from the Pravda repository as
     # ghcr.io/opensanctions/pravda-browser. Pinned to the opensanctions-pravda
-    # version in pyproject.toml (>=0.1.3) so the bundled Playwright server
+    # version in pyproject.toml (>=0.1.5) so the bundled Playwright server
     # version matches the client pinned transitively through that package.
-    image: ghcr.io/opensanctions/pravda-browser:0.1.3
+    image: ghcr.io/opensanctions/pravda-browser:0.1.5
     init: true
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     # Playwright's server exposes an HTTP /json listing of its browser
     # endpoints; it answers only once the WebSocket server is accepting
     # connections, so this doubles as a readiness gate for clients.
@@ -38,11 +38,11 @@ services:
       POSTGRES_PASSWORD: pravda
       POSTGRES_DB: pravda
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pravda"]
+      test: ["CMD-SHELL", "pg_isready -U pravda -d pravda"]
       interval: 10s
       timeout: 5s
       retries: 5

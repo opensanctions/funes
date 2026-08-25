@@ -1,0 +1,35 @@
+# Funes/Pravda PostgreSQL 18, published on localhost:5432.
+#
+# Credentials and database name match the PRAVDA_DATABASE_URL default in
+# .env.example: pravda:pravda@localhost:5432/pravda.
+#
+# Data lives in the named podman volume `funes-postgres-data`, which survives
+# container recreation (quadlet recreates the container on every start).
+# No separate .volume unit is needed: podman creates the named volume on
+# first use and never removes it with the container.
+[Unit]
+Description=Funes: PostgreSQL 18 for Pravda
+
+[Container]
+Image=docker.io/library/postgres:18
+ContainerName=funes-postgres
+PublishPort=127.0.0.1:5432:5432
+Environment=POSTGRES_USER=pravda
+Environment=POSTGRES_PASSWORD=pravda
+Environment=POSTGRES_DB=pravda
+Volume=funes-postgres-data:/var/lib/postgresql
+# Mirror of the old compose healthcheck; visible via `podman ps` /
+# `podman healthcheck run funes-postgres`.
+HealthCmd=pg_isready -U pravda -d pravda
+HealthInterval=10s
+HealthTimeout=5s
+HealthRetries=5
+
+[Service]
+# The first start must pull the image, which can exceed systemd's 90s default.
+TimeoutStartSec=300
+
+[Install]
+# Applied by the quadlet generator at daemon-reload time: starts the stack
+# whenever the user systemd instance starts (login, or boot with linger).
+WantedBy=default.target
