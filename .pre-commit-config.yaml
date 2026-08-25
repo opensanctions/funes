@@ -1,15 +1,26 @@
+default_install_hook_types: [pre-commit, post-checkout]
+
 repos:
   - repo: local
     hooks:
+      - id: uv-sync
+        name: uv sync
+        entry: uv sync --locked
+        language: system
+        stages: [post-checkout]
+        always_run: true
+        pass_filenames: false
       - id: ruff-check
         name: ruff lint
         entry: uv run ruff check --fix
         language: system
+        stages: [pre-commit]
         types: [python]
         pass_filenames: false
       - id: ruff-format
         name: ruff format
         entry: uv run ruff format
         language: system
+        stages: [pre-commit]
         types: [python]
         pass_filenames: false
