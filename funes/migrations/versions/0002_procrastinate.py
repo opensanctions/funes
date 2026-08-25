@@ -18,7 +18,6 @@ from collections.abc import Sequence
 from importlib.resources import files
 
 import sqlalchemy as sa
-import sqlalchemy.util
 from alembic import op
 
 revision: str = "0002"
@@ -65,18 +64,12 @@ def upgrade() -> None:
     script = (
         files("funes.migrations").joinpath("sql").joinpath(SCHEMA_ASSET).read_text()
     )
-    # Run the multi-statement script through the raw psycopg cursor with no
-    # parameters: SQLAlchemy's exec_driver_sql would pass an empty parameter
-    # set, making psycopg treat the script's `%` characters (plpgsql RAISE
-    # format strings) as bad placeholders. psycopg executes a parameterless
-    # multi-statement script in one round trip, DO $$ blocks included.
-    # The driver connection is psycopg's AsyncCursor behind the sync facade
-    # Alembic sees, so each call is bridged with await_only.
-    cursor = op.get_bind().connection.driver_connection.cursor()
-    try:
-        sqlalchemy.util.await_only(cursor.execute(script))
-    finally:
-        sqlalchemy.util.await_only(cursor.close())
+    # Execute the multi-statement script through SQLAlchemy's public
+    # exec_driver_sql with no_parameters: psycopg otherwise treats the
+    # script's `%` characters (plpgsql RAISE format strings) as bad
+    # placeholders when a parameter set is passed. The parameterless
+    # multi-statement script (DO $$ blocks included) runs in one round trip.
+    op.get_bind().exec_driver_sql(script, execution_options={"no_parameters": True})
 
 
 def downgrade() -> None:
