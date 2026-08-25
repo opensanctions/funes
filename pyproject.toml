@@ -9,7 +9,6 @@ dependencies = [
     "beautifulsoup4>=4.15.0",
     "click>=8.4.1",
     "fsspec[gcs]>=2026.6.0",
-    "openai>=2.41.1",
     "opensanctions-pravda>=0.1.6",
     "pillow>=12.2.0",
     "procrastinate==3.9.0",
