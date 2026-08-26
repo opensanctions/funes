@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=extraction_schema.json
+name: extraction
+cases:
+- name: office_of_the_sg
+  inputs:
+    fixture: office_of_the_sg
+    url: https://www.caf.example.org/about/office-of-the-sg
+  expected_output:
+    kind: extraction
+    persons:
+    - name: Mirela Voss
+      positions:
+      - name: Secretary-General
+    - name: Tomas Lindqvist
+      positions:
+      - name: Chef de Cabinet
+- name: roster_table
+  inputs:
+    fixture: roster_table
+    url: https://www.lbc.example.org/governance/delegates
+  expected_output:
+    kind: extraction
+    persons:
+    - name: Ms. Ingrid Halloway
+      positions:
+      - name: Delegate
+        organization: Lakes Basin Commission
+        start_date: Mar, 2024
+    - name: Mr. Peter Oskanson
+      positions:
+      - name: Alternate
+        organization: Lakes Basin Commission
+        start_date: Mar, 2024
+    - name: Dr. Marta Velling
+      positions:
+      - name: Delegate
+        organization: Lakes Basin Commission
+        start_date: Jun, 2025
+    - name: Mrs. Rosa Delacampra
+      positions:
+      - name: Alternate
+        organization: Lakes Basin Commission
+        start_date: Jun, 2025
+    - name: Mr. Anders Quill
+      positions:
+      - name: Delegate
+        organization: Lakes Basin Commission
+        start_date: Jan, 2026
+evaluators:
+- ExtractionF1
