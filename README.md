@@ -43,10 +43,10 @@ uv run funes migrate
 ```
 
 `funes migrate` applies two independent Alembic ledgers to the shared
-Postgres database, then runs an **append-only import**: URL/organization
-rows from the configured input CSVs that are not yet in the page catalogue
-are inserted. Missing associations may be added to an existing page, but
-existing records are never updated or deleted.
+Postgres database, then bootstraps the page catalogue from the configured
+input CSVs. The import is append-only: it creates missing pages and
+URL/organization associations, but never updates or deletes existing records.
+Running it again with the same inputs has no effect.
 
 - **Pravda's own ledger** ships with the `opensanctions-pravda` package and
   is applied as-is.
@@ -63,26 +63,30 @@ existing records are never updated or deleted.
 
 ## Page catalogue
 
-All pages are equal regardless of origin. A Page has a URL and may have
-zero or more organization associations; organization associations come
-from the input CSVs during `funes migrate`, and future agent-proposed
-pages need not have an organization. The catalogue is append-only —
-migration never updates or removes existing records.
+A Page is a durable crawl target identified by a unique URL and may have zero
+or more organization associations. The CSV import is only a bootstrap
+mechanism: Funes stores no source or provenance distinction, and pages later
+proposed by agents will be stored exactly like imported pages. A proposed page
+need not have a known organization.
 
 ## Usage
 
 All commands run through the `funes` console script (installed by `uv sync`).
 
 ```bash
-uv run funes migrate                   # apply schemas, then append-only import of new URL/organization associations
-uv run funes enqueue                  # queue one job per persisted page
-uv run funes worker                   # run a worker that executes queued jobs
+uv run funes migrate  # apply schemas and import missing pages
+uv run funes enqueue  # queue one job per persisted page
+uv run funes worker   # execute queued jobs
 ```
 
-`funes enqueue` reads persisted pages from the catalogue and queues exactly
-one job per page, passing only its `page_id`; it does not create extraction
-rows. `funes worker` executes queued jobs with its configured model and
-persists a completed Extraction with its result for each page. Queued,
-running, and failed work is tracked by [Procrastinate](https://procrastinate.readthedocs.io/),
-a Postgres-backed job queue that reuses the same database (no new
-environment variables — it connects through `PRAVDA_DATABASE_URL`).
+For now, each `funes enqueue` invocation selects every persisted page and
+queues one job per page. The job payload contains only `page_id`; enqueue does
+not create extraction rows. The worker resolves the Page, uses the model from
+its own configuration, and persists an Extraction and its nested result only
+after successful capture and extraction. Re-enqueuing a Page can therefore
+produce another historical Extraction for it.
+
+Queued, running, and failed work is tracked by
+[Procrastinate](https://procrastinate.readthedocs.io/), a Postgres-backed job
+queue that reuses `PRAVDA_DATABASE_URL`. A failed job does not leave an
+incomplete Extraction row.
