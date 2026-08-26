@@ -46,5 +46,12 @@ cases:
       - name: Delegate
         organization: Lakes Basin Commission
         start_date: Jan, 2026
+- name: bot_challenge
+  inputs:
+    fixture: bot_challenge
+    url: https://www.nw-tribunal.example.org/secretariat/council
+  expected_output:
+    kind: broken
+    reason: Bot-detection security challenge interstitial ("Just a moment...", "verifies you are not a bot"); no usable source content.
 evaluators:
 - ExtractionF1

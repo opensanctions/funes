@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext
 
 from evals.models import FixtureInput
-from funes.extract import Extraction, PageResult
+from funes.extract import BrokenPage, Extraction, PageResult
 
 
 def _norm(value: str) -> str:
@@ -47,7 +47,9 @@ class ExtractionF1(Evaluator[FixtureInput, PageResult]):
     """Score extracted persons and person-position pairs against ground truth.
 
     Comparison is on normalized names only; organization, dates, and other
-    fields are deliberately unscored. Emits one assertion (exact person set)
+    fields are deliberately unscored. For a ``BrokenPage`` expectation, the
+    sole check is that the output is also broken with a stated reason. Emits
+    one assertion (exact person set)
     and two scores (person F1, person-position pair F1).
     """
 
@@ -55,6 +57,18 @@ class ExtractionF1(Evaluator[FixtureInput, PageResult]):
         self, ctx: EvaluatorContext[FixtureInput, PageResult]
     ) -> dict[str, EvaluationReason | float]:
         expected = ctx.expected_output
+        if isinstance(expected, BrokenPage):
+            return {
+                "broken_match": EvaluationReason(
+                    isinstance(ctx.output, BrokenPage)
+                    and bool(ctx.output.reason.strip()),
+                    reason=(
+                        f"output is {ctx.output.kind!r}, expected broken"
+                        if not isinstance(ctx.output, BrokenPage)
+                        else "reason stated"
+                    ),
+                )
+            }
         assert isinstance(expected, Extraction)
         if not isinstance(ctx.output, Extraction):
             return {
