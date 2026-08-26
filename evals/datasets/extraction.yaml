@@ -105,5 +105,39 @@ cases:
       - name: Board member
         organization: Meridian Accord
         jurisdiction: Southern Region
+- name: nationality_vs_origin
+  inputs:
+    fixture: nationality_vs_origin
+    url: https://www.helixconsortium.example.org/our-team
+  expected_output:
+    kind: extraction
+    persons:
+    - name: Dr. Amara Nkemdirim
+      positions:
+      - name: Executive officer
+        organization: Helix Consortium
+      countries:
+      - Kelmora
+    - name: Petar Novakovic
+      positions:
+      - name: Communications officer
+        organization: Helix Consortium
+      countries:
+      - Solvaria
+      - Meridia
+    - name: Marina Delgado
+      positions:
+      - name: Partnerships officer
+        organization: Helix Consortium
+        start_date: '2019'
+    - name: Maxime Perrault
+      positions:
+      - name: Communications officer
+        organization: Helix Consortium
+    - name: Judith Palmer
+      positions:
+      - name: Resource mobilization manager
+        organization: Helix Consortium
+        start_date: '2021'
 evaluators:
 - ExtractionF1
