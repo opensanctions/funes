@@ -140,5 +140,29 @@ cases:
       - name: Chair, Standards Committee (Zephyria)
         organization: Corvara Insurance Supervisors Alliance
         jurisdiction: Zephyria
+- name: cross_roster_duplicate
+  inputs:
+    fixture: cross_roster_duplicate
+    url: https://www.viat.example.org/chambers
+  expected_output:
+    kind: extraction
+    persons:
+    - name: Justice Aurelio Brandt
+      positions:
+      - name: Judge of the First Chamber
+        organization: Velandra International Arbitration Tribunal
+        start_date: '2021'
+        end_date: '2025'
+      - name: Reserve Judge of the First Chamber
+        organization: Velandra International Arbitration Tribunal
+        start_date: '2026'
+    - name: Justice Irmgard Havel
+      positions:
+      - name: Judge of the First Chamber
+        organization: Velandra International Arbitration Tribunal
+    - name: Justice Tomas Reyes Ocampo
+      positions:
+      - name: Reserve Judge of the First Chamber
+        organization: Velandra International Arbitration Tribunal
 evaluators:
 - ExtractionF1
