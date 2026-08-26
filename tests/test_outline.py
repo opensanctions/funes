@@ -2,7 +2,7 @@
 
 import pytest
 
-from funes.outline import build_outline
+from funes.outline import build_outline, har_resource_media_types
 
 BASE = "https://example.org/about/"
 
@@ -127,3 +127,90 @@ def test_singular_wrappers_collapse() -> None:
 def test_non_http_base_url_fails_loud() -> None:
     with pytest.raises(ValueError):
         build_outline("about/page.html", "<body><p>x</p></body>")
+
+
+def har_entry(url: str, file: str | None, mime_type: str | None) -> dict:
+    """One HAR entry with the given stored body and media type."""
+    content: dict = {}
+    if file is not None:
+        content["_file"] = file
+    if mime_type is not None:
+        content["mimeType"] = mime_type
+    return {"request": {"url": url}, "response": {"content": content}}
+
+
+def test_media_types_none() -> None:
+    assert har_resource_media_types(None) == {}
+
+
+def test_media_types_bodyless_entries_skipped() -> None:
+    har = {
+        "log": {
+            "entries": [
+                har_entry("https://example.org/a", None, "text/html"),
+                {
+                    "request": {"url": "https://example.org/b"},
+                    "response": {"content": {}},
+                },
+            ]
+        }
+    }
+    assert har_resource_media_types(har) == {}
+
+
+def test_media_types_normalization() -> None:
+    har = {
+        "log": {
+            "entries": [
+                har_entry(
+                    "https://example.org/a",
+                    "storage/a",
+                    "  Image/JPEG ; charset=utf-8 ",
+                ),
+            ]
+        }
+    }
+    assert har_resource_media_types(har) == {"storage/a": "image/jpeg"}
+
+
+def test_media_types_multiple_resources() -> None:
+    har = {
+        "log": {
+            "entries": [
+                har_entry("https://example.org/a", "storage/a", "text/html"),
+                har_entry("https://example.org/b", "storage/b", "image/png"),
+                har_entry("https://example.org/c", "storage/c", "application/json"),
+            ]
+        }
+    }
+    assert har_resource_media_types(har) == {
+        "storage/a": "text/html",
+        "storage/b": "image/png",
+        "storage/c": "application/json",
+    }
+
+
+def test_media_types_missing_mime_fails_loud() -> None:
+    har = {"log": {"entries": [har_entry("https://example.org/a", "storage/a", None)]}}
+    with pytest.raises(ValueError, match="lacks a mimeType"):
+        har_resource_media_types(har)
+
+
+@pytest.mark.parametrize(
+    "mime_type",
+    [
+        "",
+        "  ",
+        "imagejpeg",
+        "image/;jpeg",
+        "image/png/foo",
+        "image / png",
+        "image/ png",
+    ],
+)
+def test_media_types_malformed_mime_fails_loud(mime_type: str) -> None:
+    har = {
+        "log": {"entries": [har_entry("https://example.org/a", "storage/a", mime_type)]}
+    }
+    with pytest.raises(ValueError, match="malformed mimeType"):
+        har_resource_media_types(har)

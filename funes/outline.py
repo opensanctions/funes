@@ -12,6 +12,7 @@ Example::
 """
 
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
@@ -114,19 +115,52 @@ def _kept_attrs(tag: Tag, url: str, bodies: dict[str, str]) -> list[tuple[str, s
     return attrs
 
 
+def har_resource_media_types(http_archive: dict | None) -> dict[str, str]:
+    """Map each stored body path to its normalized response media type.
+
+    Media types are lowercased and stripped of parameters and whitespace.
+    A stored body without a well-formed media type raises: guessing from the
+    file extension would silently mislabel content.
+    """
+    media: dict[str, str] = {}
+    for url, file, content in _stored_bodies(http_archive):
+        media[file] = _normalized_media_type(content.get("mimeType"), url)
+    return media
+
+
+def _stored_bodies(http_archive: dict | None) -> Iterator[tuple[str, str, dict]]:
+    """Yield ``(url, file, content)`` for every HAR entry with a stored body."""
+    if http_archive is None:
+        return
+    for entry in http_archive["log"]["entries"]:
+        content = entry["response"]["content"]
+        file = content.get("_file")
+        if file:
+            yield entry["request"]["url"], file, content
+
+
+def _normalized_media_type(mime_type: str | None, url: str) -> str:
+    """Lowercase a media type, stripping parameters; fail if unusable."""
+    if not isinstance(mime_type, str):
+        raise ValueError(f"stored body for {url!r} lacks a mimeType")  # noqa: TRY004
+    media_type = mime_type.split(";", 1)[0].strip().lower()
+    parts = media_type.split("/")
+    if len(parts) != 2 or not all(part.split() == [part] for part in parts):
+        raise ValueError(
+            f"stored body for {url!r} has malformed mimeType {mime_type!r}"
+        )
+    return media_type
+
+
 def _har_bodies(http_archive: dict | None) -> dict[str, str]:
     """Map HAR request URLs to their stored body paths (``content._file``).
 
     The latest entry with a stored body wins; bodyless entries never shadow
     an earlier body for the same URL.
     """
-    if http_archive is None:
-        return {}
     bodies: dict[str, str] = {}
-    for entry in http_archive["log"]["entries"]:
-        file = entry["response"]["content"].get("_file")
-        if file:
-            bodies[entry["request"]["url"]] = file
+    for url, file, _content in _stored_bodies(http_archive):
+        bodies[url] = file
     return bodies
 
 
