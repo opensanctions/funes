@@ -105,5 +105,40 @@ cases:
       - name: Board member
         organization: Meridian Accord
         jurisdiction: Southern Region
+- name: parenthetical_home_authority
+  inputs:
+    fixture: parenthetical_home_authority
+    url: https://www.cisa.example.org/governance/leadership
+  expected_output:
+    kind: extraction
+    persons:
+    - name: Aksel Brandvold
+      positions:
+      - name: Chair, Executive Committee (Norlandia)
+        organization: Corvara Insurance Supervisors Alliance
+        jurisdiction: Norlandia
+    - name: Miriam Osei-Trekker
+      positions:
+      - name: Vice Chair, Executive Committee (Valmont Margin Authority)
+        organization: Corvara Insurance Supervisors Alliance
+    - name: Hugo Delacroix-Ferre
+      positions:
+      - name: Vice Chair, Executive Committee (Taldoria)
+        organization: Corvara Insurance Supervisors Alliance
+        jurisdiction: Taldoria
+    - name: Yuki Marchetti
+      positions:
+      - name: Chair, Audit Committee (Verucia)
+        organization: Corvara Insurance Supervisors Alliance
+        jurisdiction: Verucia
+    - name: Priscilla Odum
+      positions:
+      - name: Chair, Budget Committee (Petricor Insurance Regulatory Board)
+        organization: Corvara Insurance Supervisors Alliance
+    - name: Jonas Mbeki-Strand
+      positions:
+      - name: Chair, Standards Committee (Zephyria)
+        organization: Corvara Insurance Supervisors Alliance
+        jurisdiction: Zephyria
 evaluators:
 - ExtractionF1
