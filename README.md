@@ -11,7 +11,7 @@ Early R&D. Currently exploring what a viable automated extraction pipeline looks
 1. Captures snapshots (plaintext + rendered HTML + screenshot) via the in-process Pravda library against a remote browser, Postgres, and an artifact store that Funes owns and runs
 2. Feeds snapshots to an LLM to extract structured "human / position" pairs
 3. Persists each completed extraction with nested extraction-scoped persons and their positions, linked to Pravda snapshot identifiers
-4. Writes each extraction's agent session as a JSONL transcript under `SESSIONS_BASE_PATH`
+4. Writes each agent run's session as one `.json` JSON-array transcript under `SESSIONS_BASE_PATH`
 
 ## Setup
 
@@ -84,7 +84,12 @@ queues one job per page. The job payload contains only `page_id`; enqueue does
 not create extraction rows. The worker resolves the Page, uses the model from
 its own configuration, and persists an Extraction and its nested result only
 after successful capture and extraction. Re-enqueuing a Page can therefore
-produce another historical Extraction for it.
+produce another historical Extraction for it. Pages whose snapshot is
+non-inspectable, or whose model output is a `BrokenPage`, get no Extraction
+row; instead the pipeline defers one review job
+(`funes.review_broken_page`, carrying page, snapshot, run, and reason) to a
+separate `broken` queue that the normal `funes worker` does not consume, so
+those jobs sit pending until review is implemented.
 
 Queued, running, and failed work is tracked by
 [Procrastinate](https://procrastinate.readthedocs.io/), a Postgres-backed job
