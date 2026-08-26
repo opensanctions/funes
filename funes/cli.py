@@ -5,6 +5,7 @@ import logging
 
 import click
 from pravda import migrate as pravda_migrate
+from procrastinate.exceptions import AlreadyEnqueued
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from funes import db
@@ -49,27 +50,41 @@ def migrate_cmd() -> None:
 
 
 @cli.command(
-    help=("Queue exactly one pipeline job per page recorded in the database and exit.")
+    help=(
+        "Queue one pipeline job per due page and exit. A page is due when it "
+        "has never been inspected, or its latest inspection was productive "
+        "and older than the revisit interval; empty and broken pages are "
+        "not re-enqueued."
+    )
 )
 def enqueue_cmd() -> None:
     config = load_config()
 
     async def enqueue() -> None:
-        """Select pages from the database and queue one job per page."""
+        """Select due pages from the database and queue one job per page."""
         engine = create_async_engine(config.pravda.database_url)
         try:
             async with async_sessionmaker(engine, expire_on_commit=False)() as session:
-                pages = await db.select_pages(session)
+                pages = await db.select_due_pages(session, config.revisit_interval)
             page_ids = [str(page.id) for page in pages]
         finally:
             await engine.dispose()
 
-        log.info("%d page(s) selected", len(page_ids))
+        queued = skipped = 0
         async with app.open_async():
-            await process_page.batch_defer_async(
-                *({"page_id": page_id} for page_id in page_ids)
-            )
-        log.info("%d job(s) queued", len(page_ids))
+            for page_id in page_ids:
+                try:
+                    await process_page.configure(
+                        queueing_lock=f"page:{page_id}"
+                    ).defer_async(page_id=page_id)
+                    queued += 1
+                except AlreadyEnqueued:
+                    # A page with a job still pending is skipped so one stale
+                    # pending job never aborts the whole sweep.
+                    skipped += 1
+        log.info(
+            "%d due, %d queued, %d already pending", len(page_ids), queued, skipped
+        )
 
     asyncio.run(enqueue())
 
