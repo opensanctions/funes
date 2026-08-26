@@ -198,5 +198,23 @@ cases:
       - name: Resource mobilization manager
         organization: Helix Consortium
         start_date: '2021'
+- name: collective_role_label
+  inputs:
+    fixture: collective_role_label
+    url: https://www.harborlight.example.org/partners/representatives
+  expected_output:
+    kind: extraction
+    persons:
+    - name: Njeri Kamau
+      positions:
+      - name: Director
+        organization: Uzima Health Initiative
+    - name: Aarav Deshpande
+      positions:
+      - name: Trustee
+        organization: Setu Foundation for Children
+    - name: Ingrid Halvorsen
+      positions:
+      - name: Executive Director
 evaluators:
 - ExtractionF1
