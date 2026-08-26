@@ -11,9 +11,11 @@ cases:
     - name: Mirela Voss
       positions:
       - name: Secretary-General
+        organization: CAF
     - name: Tomas Lindqvist
       positions:
       - name: Chef de Cabinet
+        organization: CAF
 - name: roster_table
   inputs:
     fixture: roster_table
@@ -24,27 +26,32 @@ cases:
     - name: Ms. Ingrid Halloway
       positions:
       - name: Delegate
-        organization: Lakes Basin Commission
+        organization: Lakes Basin Commission Council
+        jurisdiction: Bellanor, Ferndale, Harwick
         start_date: Mar, 2024
     - name: Mr. Peter Oskanson
       positions:
       - name: Alternate
-        organization: Lakes Basin Commission
+        organization: Lakes Basin Commission Council
+        jurisdiction: Bellanor, Ferndale, Harwick
         start_date: Mar, 2024
     - name: Dr. Marta Velling
       positions:
       - name: Delegate
-        organization: Lakes Basin Commission
+        organization: Lakes Basin Commission Council
+        jurisdiction: Caldera Isles, Pinehaven, Stonebrook
         start_date: Jun, 2025
     - name: Mrs. Rosa Delacampra
       positions:
       - name: Alternate
-        organization: Lakes Basin Commission
+        organization: Lakes Basin Commission Council
+        jurisdiction: Caldera Isles, Pinehaven, Stonebrook
         start_date: Jun, 2025
     - name: Mr. Anders Quill
       positions:
       - name: Delegate
-        organization: Lakes Basin Commission
+        organization: Lakes Basin Commission Council
+        jurisdiction: Thornwick
         start_date: Jan, 2026
 - name: bot_challenge
   inputs:
@@ -76,23 +83,27 @@ cases:
       positions:
       - name: Board member
         organization: Meridian Accord
+        jurisdiction: Northern Region
       - name: National Coordinator, Zarvia Multi-Stakeholder Group
         organization: Zarvia Multi-Stakeholder Group
     - name: Nadia Solheim
       positions:
       - name: Board member alternate
         organization: Meridian Accord
+        jurisdiction: Northern Region
       - name: Deputy Minister of Environment, Republic of Halvard
         jurisdiction: Republic of Halvard
     - name: Peter Anand Mukherjee
       positions:
       - name: Board member
         organization: Meridian Accord
+        jurisdiction: Southern Region
       - name: Head of Extractives Practice, Corvin Policy Institute
         organization: Corvin Policy Institute
     - name: Ingrid Dahl
       positions:
       - name: Board member
         organization: Meridian Accord
+        jurisdiction: Southern Region
 evaluators:
 - ExtractionF1
