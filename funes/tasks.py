@@ -158,19 +158,16 @@ async def process_page(page_id: str) -> None:
                 outcome = db.Outcome.PRODUCTIVE
             else:
                 outcome = db.Outcome.EMPTY
-                prior = (
-                    await session.execute(
-                        db.select(db.Inspection).where(
-                            db.Inspection.page_id == page.id,
-                            db.Inspection.created_at
-                            == select(func.max(db.Inspection.created_at))
-                            .where(db.Inspection.page_id == page.id)
-                            .scalar_subquery(),
-                        )
+                result = await session.execute(
+                    db.select(db.Inspection).where(
+                        db.Inspection.page_id == page.id,
+                        db.Inspection.created_at
+                        == select(func.max(db.Inspection.created_at))
+                        .where(db.Inspection.page_id == page.id)
+                        .scalar_subquery(),
                     )
-                    .scalars()
-                    .first()
                 )
+                prior = result.scalars().first()
                 if prior is not None and prior.outcome == db.Outcome.PRODUCTIVE:
                     log.warning(
                         "%s → empty after a prior productive inspection; "
