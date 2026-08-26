@@ -10,7 +10,7 @@ Early R&D. Currently exploring what a viable automated extraction pipeline looks
 
 1. Captures snapshots (plaintext + rendered HTML + screenshot) via the in-process Pravda library against a remote browser, Postgres, and an artifact store that Funes owns and runs
 2. Feeds snapshots to an LLM to extract structured "human / position" pairs
-3. Stores queued extractions in PostgreSQL, linked to Pravda snapshot identifiers; each successful extraction stores nested extraction-scoped persons and their positions
+3. Persists each completed extraction with nested extraction-scoped persons and their positions, linked to Pravda snapshot identifiers
 4. Writes each extraction's agent session as a JSONL transcript under `SESSIONS_BASE_PATH`
 
 ## Setup
@@ -43,7 +43,10 @@ uv run funes migrate
 ```
 
 `funes migrate` applies two independent Alembic ledgers to the shared
-Postgres database:
+Postgres database, then runs an **append-only import**: URL/organization
+rows from the configured input CSVs that are not yet in the page catalogue
+are inserted. Missing associations may be added to an existing page, but
+existing records are never updated or deleted.
 
 - **Pravda's own ledger** ships with the `opensanctions-pravda` package and
   is applied as-is.
@@ -58,20 +61,28 @@ Postgres database:
   vendoring the relevant upstream upgrade SQL for that release in a new
   Funes revision; historical revisions never read the installed package.
 
+## Page catalogue
+
+All pages are equal regardless of origin. A Page has a URL and may have
+zero or more organization associations; organization associations come
+from the input CSVs during `funes migrate`, and future agent-proposed
+pages need not have an organization. The catalogue is append-only —
+migration never updates or removes existing records.
+
 ## Usage
 
-All commands run through the `funes` console script (installed by `uv sync`). The input
-location is an fsspec URL set via `INPUT_BASE_PATH` in `.env`
-(a local dir or a `gs://`/`s3://` bucket prefix):
+All commands run through the `funes` console script (installed by `uv sync`).
 
 ```bash
-uv run funes enqueue                    # defer jobs for every URL in every input CSV
-uv run funes enqueue -d hio_leadership  # one dataset only
-uv run funes enqueue -n 20              # random sample of 20 page inputs
-
-uv run funes worker                     # run a worker that executes queued jobs
+uv run funes migrate                   # apply schemas, then append-only import of new URL/organization associations
+uv run funes enqueue                  # queue one job per persisted page
+uv run funes worker                   # run a worker that executes queued jobs
 ```
 
-Work is queued through [Procrastinate](https://procrastinate.readthedocs.io/),
+`funes enqueue` reads persisted pages from the catalogue and queues exactly
+one job per page, passing only its `page_id`; it does not create extraction
+rows. `funes worker` executes queued jobs with its configured model and
+persists a completed Extraction with its result for each page. Queued,
+running, and failed work is tracked by [Procrastinate](https://procrastinate.readthedocs.io/),
 a Postgres-backed job queue that reuses the same database (no new
 environment variables — it connects through `PRAVDA_DATABASE_URL`).
