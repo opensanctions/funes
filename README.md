@@ -31,10 +31,8 @@ One-shot commands run through the `funes` console script; the worker is Procrast
 ```bash
 uv run --env-file .env funes migrate  # apply schemas and import missing pages
 uv run --env-file .env funes enqueue  # queue one job per persisted page
-uv run --env-file .env procrastinate worker process  # consume the process queue (-c/--concurrency N)
+uv run --env-file .env procrastinate worker  # consume the process queue (-c/--concurrency N)
 ```
-
-The worker listens only on the `process` queue; the `review` queue is dormant by design, so running the worker without queue arguments would also pick up review jobs.
 
 Queued, running, and failed jobs live in the same Postgres database and are inspected with Procrastinate's own tooling:
 
