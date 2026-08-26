@@ -30,7 +30,7 @@ One-shot commands run through the `funes` console script; the worker is Procrast
 
 ```bash
 uv run --env-file .env funes migrate  # apply schemas and import missing pages
-uv run --env-file .env funes enqueue  # queue one job per persisted page
+uv run --env-file .env funes enqueue  # queue one job per due page (revisit interval, deduped)
 uv run --env-file .env procrastinate worker  # consume the process queue (-c/--concurrency N)
 ```
 
@@ -44,7 +44,7 @@ uv run --env-file .env procrastinate healthchecks     # configuration and DB san
 
 `migrate` is a release step, not an app-startup step: run it once per deploy, before starting `enqueue` or `worker`. It applies two Alembic ledgers to the shared Postgres database — Pravda's, shipped with the `opensanctions-pravda` package, and Funes's (`funes/migrations/`), which tracks Funes's tables plus the Procrastinate job-queue schema vendored at the pinned Procrastinate version. Bumping Procrastinate means vendoring its upgrade SQL in a new Funes revision. It then bootstraps the page catalogue from the CSVs under `INPUT_BASE_PATH` (columns `organization,url`); the import is append-only and never updates or deletes existing records.
 
-`enqueue` queues one `page_id` job per persisted page and creates no extraction rows. The worker resolves the page, captures a snapshot, runs extraction with the model from its own configuration, and commits the extraction graph only on success — a failed job leaves no incomplete extraction behind. Re-enqueuing a page produces another historical extraction.
+`enqueue` queues one `page_id` job per due page: pages never inspected, plus pages whose latest inspection was productive and older than `REVISIT_INTERVAL_DAYS`; empty and broken pages are not re-enqueued. Each job is deferred with a per-page queueing lock, so a page that already has a pending job is skipped rather than double-queued. The worker resolves the page, captures a snapshot, runs extraction with the model from its own configuration, and records every terminal run — productive, empty, or broken — as an inspection row; the extraction graph is committed only on productive runs.
 
 ## Tests
 

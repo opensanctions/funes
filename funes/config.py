@@ -2,6 +2,7 @@
 
 import os
 from dataclasses import dataclass
+from datetime import timedelta
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,7 @@ class Config:
     model: ModelConfig
     input: InputConfig
     sessions: SessionsConfig
+    revisit_interval: timedelta
 
 
 def load_config() -> Config:
@@ -51,4 +53,5 @@ def load_config() -> Config:
         sessions=SessionsConfig(
             base_path=os.environ["SESSIONS_BASE_PATH"],
         ),
+        revisit_interval=timedelta(days=float(os.environ["REVISIT_INTERVAL_DAYS"])),
     )
