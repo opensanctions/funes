@@ -1,19 +1,18 @@
-"""Funes-owned extractions and their nested person/position graph."""
+"""Durable page catalogue and completed-extraction persistence."""
 
 import uuid
 from datetime import UTC, datetime
 
 from pravda import Snapshot
-from sqlalchemy import (
-    JSON,
-    CheckConstraint,
-    DateTime,
-    ForeignKey,
-    Text,
-    UniqueConstraint,
-)
+from sqlalchemy import JSON, DateTime, ForeignKey, Text, UniqueConstraint, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    mapped_column,
+    relationship,
+)
 
 # The Pydantic structured-output result from funes.extract, aliased to
 # avoid colliding with the ORM Extraction model below.
@@ -24,61 +23,61 @@ class Base(DeclarativeBase):
     pass
 
 
-class Extraction(Base):
-    """One URL selected for capture and extraction, with its result graph."""
+class Page(Base):
+    """One durable web page, identified by URL, with its organizations."""
 
-    __tablename__ = "extraction"
-    __table_args__ = (
-        # A row is either fully pending (all outcome columns null) or fully
-        # processed (snapshot, capture, and processing timestamps present with
-        # a valid outcome); 'extracted' forbids broken_reason, 'broken'
-        # requires it.
-        CheckConstraint(
-            "(snapshot_id IS NULL AND captured_at IS NULL AND outcome IS NULL "
-            "AND processed_at IS NULL AND broken_reason IS NULL) "
-            "OR (snapshot_id IS NOT NULL AND captured_at IS NOT NULL "
-            "AND processed_at IS NOT NULL "
-            "AND outcome IN ('extracted', 'broken') "
-            "AND (outcome <> 'extracted' OR broken_reason IS NULL) "
-            "AND (outcome <> 'broken' OR broken_reason IS NOT NULL))",
-            name="extraction_outcome",
-        ),
-    )
+    __tablename__ = "page"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    url: Mapped[str] = mapped_column(Text)
-    model: Mapped[str] = mapped_column(Text)
-    snapshot_id: Mapped[uuid.UUID | None]
+    url: Mapped[str] = mapped_column(Text, unique=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
-    captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    outcome: Mapped[str | None] = mapped_column(Text)
-    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    broken_reason: Mapped[str | None] = mapped_column(Text)
 
-    pages: Mapped[list["Page"]] = relationship(
-        back_populates="extraction", cascade="all, delete-orphan"
+    organizations: Mapped[list["PageOrganization"]] = relationship(
+        back_populates="page", cascade="all, delete-orphan"
     )
+    extractions: Mapped[list["Extraction"]] = relationship(
+        back_populates="page", cascade="all, delete-orphan"
+    )
+
+
+class PageOrganization(Base):
+    """One organization associated with a page."""
+
+    __tablename__ = "page_organization"
+    __table_args__ = (UniqueConstraint("page_id", "organization"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    page_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("page.id", ondelete="CASCADE")
+    )
+    organization: Mapped[str] = mapped_column(Text)
+
+    page: Mapped[Page] = relationship(back_populates="organizations")
+
+
+class Extraction(Base):
+    """One completed extraction of a page, with its result graph."""
+
+    __tablename__ = "extraction"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    page_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("page.id", ondelete="CASCADE")
+    )
+    model: Mapped[str] = mapped_column(Text)
+    snapshot_id: Mapped[uuid.UUID]
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    extracted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    page: Mapped[Page] = relationship(back_populates="extractions")
     persons: Mapped[list["Person"]] = relationship(
         back_populates="extraction", cascade="all, delete-orphan"
     )
-
-
-class Page(Base):
-    """One input dataset and organization associated with an extraction."""
-
-    __tablename__ = "page"
-    __table_args__ = (UniqueConstraint("extraction_id", "dataset"),)
-
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    extraction_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("extraction.id", ondelete="CASCADE")
-    )
-    dataset: Mapped[str] = mapped_column(Text)
-    organization: Mapped[str] = mapped_column(Text)
-
-    extraction: Mapped[Extraction] = relationship(back_populates="pages")
 
 
 class Person(Base):
@@ -120,40 +119,69 @@ class Position(Base):
     person: Mapped[Person] = relationship(back_populates="positions")
 
 
-async def register_extractions(
-    session: AsyncSession,
-    associations: list[tuple[str, str, str]],
-    model: str,
-) -> dict[str, Extraction]:
-    """Add one extraction per URL and attach all selected input associations."""
-    extractions = {url: Extraction(url=url, model=model) for _, url, _ in associations}
-    session.add_all(extractions.values())
-    await session.flush()
-    session.add_all(
-        Page(
-            extraction_id=extractions[url].id,
-            dataset=dataset,
-            organization=organization,
-        )
-        for dataset, url, organization in associations
+async def import_pages(session: AsyncSession, rows: list[tuple[str, str]]) -> None:
+    """Append-only import of (url, organization) rows into the page catalogue.
+
+    Creates missing pages and page-organization associations; existing rows
+    are left untouched (insert-on-conflict does nothing). No updates or
+    deletes are ever performed.
+    """
+    urls = list(dict.fromkeys(url for url, _ in rows))
+    if not urls:
+        return
+    await session.execute(
+        insert(Page)
+        .values([{Page.url: url} for url in urls])
+        .on_conflict_do_nothing(index_elements=[Page.url])
     )
-    return extractions
+    # Map url -> id for association inserts.
+    id_by_url = dict(
+        (
+            await session.execute(select(Page.url, Page.id).where(Page.url.in_(urls)))
+        ).all()
+    )
+    associations = [
+        {PageOrganization.page_id: id_by_url[url], PageOrganization.organization: org}
+        for url, org in rows
+        if org
+    ]
+    if associations:
+        await session.execute(
+            insert(PageOrganization)
+            .values(associations)
+            .on_conflict_do_nothing(
+                index_elements=[PageOrganization.page_id, PageOrganization.organization]
+            )
+        )
 
 
-def extraction_succeeded(
+async def select_pages(session: AsyncSession) -> list[Page]:
+    """Return all catalogue pages."""
+    result = await session.execute(select(Page).order_by(Page.url))
+    return list(result.scalars().all())
+
+
+def store_extraction(
     session: AsyncSession,
-    extraction: Extraction,
+    *,
+    extraction_id: uuid.UUID,
+    page_id: uuid.UUID,
+    model: str,
     snapshot: Snapshot,
     result: ExtractionResult,
-) -> None:
-    """Store a successful extraction and its nested person/position graph."""
-    extraction.snapshot_id = snapshot.id
-    extraction.captured_at = snapshot.captured_at
-    extraction.outcome = "extracted"
-    extraction.processed_at = datetime.now(UTC)
-    session.add_all(
+) -> Extraction:
+    """Construct and persist one successful extraction and its nested graph."""
+    extraction = Extraction(
+        id=extraction_id,
+        page_id=page_id,
+        model=model,
+        snapshot_id=snapshot.id,
+        captured_at=snapshot.captured_at,
+        extracted_at=datetime.now(UTC),
+    )
+    extraction.persons = [
         Person(
-            extraction_id=extraction.id,
+            extraction_id=extraction_id,
             name=person.name,
             dob=person.dob,
             bio=person.bio,
@@ -171,18 +199,6 @@ def extraction_succeeded(
             ],
         )
         for person in result.persons
-    )
-
-
-def extraction_broken(
-    session: AsyncSession,
-    extraction: Extraction,
-    snapshot: Snapshot,
-    reason: str,
-) -> None:
-    """Record a capture/extraction failure: outcome metadata only, no persons."""
-    extraction.snapshot_id = snapshot.id
-    extraction.captured_at = snapshot.captured_at
-    extraction.outcome = "broken"
-    extraction.processed_at = datetime.now(UTC)
-    extraction.broken_reason = reason
+    ]
+    session.add(extraction)
+    return extraction
