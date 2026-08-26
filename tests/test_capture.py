@@ -53,13 +53,12 @@ def test_navigation_error_no_artifacts() -> None:
         )
     )
     assert issue is not None
-    assert "plaintext" in issue and "rendered_html" in issue
+    assert "rendered_html" in issue
     assert "ERR_NAME_NOT_RESOLVED" in issue
 
 
-def test_missing_plaintext_only() -> None:
-    issue = inspectability_issue(make_snapshot(plaintext=None))
-    assert issue == "missing artifact(s): plaintext"
+def test_no_plaintext_is_inspectable() -> None:
+    assert inspectability_issue(make_snapshot(plaintext=None)) is None
 
 
 def test_missing_rendered_html_only() -> None:
@@ -71,7 +70,7 @@ def test_missing_both_artifacts_no_diagnostics() -> None:
     issue = inspectability_issue(
         make_snapshot(plaintext=None, rendered_html=None, http_status=None)
     )
-    assert issue == "missing artifact(s): plaintext, rendered_html"
+    assert issue == "missing artifact(s): rendered_html"
 
 
 def test_bad_final_url_scheme() -> None:
@@ -110,8 +109,8 @@ def test_optional_screenshot_and_har() -> None:
 
 def test_multiline_error_truncated_to_first_line() -> None:
     error = 'TimeoutError: Timeout 30000ms exceeded.\n=========================== logs ===========================\nnavigating to "https://example.org/", waiting until "load"\n============================================================'
-    issue = inspectability_issue(make_snapshot(error=error, plaintext=None))
+    issue = inspectability_issue(make_snapshot(error=error, rendered_html=None))
     assert (
         issue
-        == "missing artifact(s): plaintext (TimeoutError: Timeout 30000ms exceeded.)"
+        == "missing artifact(s): rendered_html (TimeoutError: Timeout 30000ms exceeded.)"
     )
