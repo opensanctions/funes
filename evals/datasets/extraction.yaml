@@ -105,5 +105,23 @@ cases:
       - name: Board member
         organization: Meridian Accord
         jurisdiction: Southern Region
+- name: collective_role_label
+  inputs:
+    fixture: collective_role_label
+    url: https://www.harborlight.example.org/partners/representatives
+  expected_output:
+    kind: extraction
+    persons:
+    - name: Njeri Kamau
+      positions:
+      - name: Director
+        organization: Uzima Health Initiative
+    - name: Aarav Deshpande
+      positions:
+      - name: Trustee
+        organization: Setu Foundation for Children
+    - name: Ingrid Halvorsen
+      positions:
+      - name: Executive Director
 evaluators:
 - ExtractionF1
