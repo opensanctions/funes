@@ -4,8 +4,7 @@ from urllib.parse import urlparse
 
 import fsspec
 from fsspec.implementations.asyn_wrapper import AsyncFileSystemWrapper
-from pravda import Pravda, PravdaConfig
-from pravda.snapshots import Snapshot
+from pravda import Pravda, PravdaConfig, Snapshot
 
 from funes.config import PravdaSettings
 
@@ -36,7 +35,11 @@ def inspectability_issue(snapshot: Snapshot) -> str | None:
     if reason is None:
         return None
     if snapshot.error:
-        diagnostics = snapshot.error
+        # Playwright errors are multiline logs; keep only the first line.
+        diagnostics = next(
+            (line.strip() for line in snapshot.error.splitlines() if line.strip()),
+            None,
+        )
     elif snapshot.http_status is not None and snapshot.http_status >= 400:
         diagnostics = f"http status {snapshot.http_status}"
     else:

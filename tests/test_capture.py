@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from pravda.snapshots import Snapshot
+from pravda import Snapshot
 
 from funes.capture import inspectability_issue
 
@@ -106,3 +106,12 @@ def test_optional_screenshot_and_har() -> None:
         http_archive={"log": {"entries": []}},
     )
     assert inspectability_issue(snapshot) is None
+
+
+def test_multiline_error_truncated_to_first_line() -> None:
+    error = 'TimeoutError: Timeout 30000ms exceeded.\n=========================== logs ===========================\nnavigating to "https://example.org/", waiting until "load"\n============================================================'
+    issue = inspectability_issue(make_snapshot(error=error, plaintext=None))
+    assert (
+        issue
+        == "missing artifact(s): plaintext (TimeoutError: Timeout 30000ms exceeded.)"
+    )
