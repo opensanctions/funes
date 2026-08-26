@@ -83,6 +83,30 @@ def test_har_body_references() -> None:
     ]
 
 
+def test_har_body_reference_matches_percent_encoded_request_url() -> None:
+    """HTML URL characters are encoded as the browser encodes HAR requests."""
+    html = '<body><p>Team</p><img src="/img/team portrait (final).png"></body>'
+    har = {
+        "log": {
+            "entries": [
+                {
+                    "request": {
+                        "url": "https://example.org/img/team%20portrait%20(final).png"
+                    },
+                    "response": {"content": {"_file": "storage/example.org/team.png"}},
+                }
+            ]
+        }
+    }
+    assert build_outline(BASE, html, har).splitlines() == [
+        '- p "Team"',
+        (
+            "- img [src=https://example.org/img/team%20portrait%20(final).png] "
+            "[body=storage/example.org/team.png]"
+        ),
+    ]
+
+
 def test_empty_subtrees_dropped_and_hidden_retained() -> None:
     """Content-free subtrees vanish; hidden content stays visible to the AI."""
     html = """

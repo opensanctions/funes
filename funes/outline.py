@@ -14,7 +14,7 @@ Example::
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 
@@ -105,7 +105,7 @@ def _kept_attrs(tag: Tag, url: str, bodies: dict[str, str]) -> list[tuple[str, s
     elif tag.name == "img":
         src = tag.get("src")
         if isinstance(src, str):
-            resolved = urljoin(url, src)
+            resolved = quote(urljoin(url, src), safe="/:?#[]@!$&'()*+,;=%")
             attrs.append(("src", resolved))
             if resolved in bodies:
                 attrs.append(("body", bodies[resolved]))
