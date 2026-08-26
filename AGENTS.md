@@ -15,7 +15,8 @@ uv sync                  # install dependencies
 docker compose up -d     # shared dev infrastructure: Postgres + headed Chrome
 uv run funes migrate     # apply Pravda and Funes schemas, bootstrap pages from CSVs
 uv run funes enqueue     # queue one job per persisted page
-uv run funes worker      # consume the process queue
+uv run procrastinate -a funes.procrastinate.app worker process  # consume the process queue
+uv run procrastinate -a funes.procrastinate.app shell list_jobs  # inspect the queue
 uv run pytest            # run the test suite
 ```
 
@@ -26,8 +27,9 @@ uv run pytest            # run the test suite
 
 ```
 funes/
-  cli.py        # migrate, enqueue, worker commands
-  tasks.py      # Procrastinate app; process_page pipeline; dormant review queue
+  procrastinate.py  # module-level Procrastinate app; the CLI's -a target; worker config
+  cli.py        # migrate, enqueue commands
+  tasks.py      # Procrastinate tasks: process_page pipeline; dormant review queue
   capture.py    # Pravda client and fsspec artifact helpers
   extract.py    # pydantic-ai extraction agent, output schema, prompt
   outline.py    # compact model-facing outline from rendered HTML + HAR
@@ -39,7 +41,7 @@ funes/
 tests/          # pytest suite
 ```
 
-All env vars are read once in `config.py`'s `load_config()`; pass the typed `Config` down rather than reading the environment elsewhere.
+All env vars are read through `config.py`'s `load_config()`, never with ad-hoc `os.environ` reads. One-shot commands call it per process; the long-lived worker shares the `config` loaded once at import in `funes/procrastinate.py`.
 
 ## Conventions
 

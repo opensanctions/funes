@@ -10,8 +10,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from funes import db
 from funes.config import load_config
 from funes.migrate import migrate
+from funes.procrastinate import app
 from funes.sources import load_inputs
-from funes.tasks import Queue, Task, build_app
+from funes.tasks import process_page
 
 log = logging.getLogger("funes")
 
@@ -64,30 +65,13 @@ def enqueue_cmd() -> None:
             await engine.dispose()
 
         log.info("%d page(s) selected", len(page_ids))
-        app = build_app(config)
         async with app.open_async():
-            await app.configure_task(
-                Task.PROCESS_PAGE, allow_unknown=False
-            ).batch_defer_async(*({"page_id": page_id} for page_id in page_ids))
+            await process_page.batch_defer_async(
+                *({"page_id": page_id} for page_id in page_ids)
+            )
         log.info("%d job(s) queued", len(page_ids))
 
     asyncio.run(enqueue())
-
-
-@cli.command(
-    help="Consume the process queue and process pages.",
-)
-@click.option(
-    "-c",
-    "--concurrency",
-    type=click.IntRange(min=1),
-    default=1,
-    help="Concurrent jobs per worker.",
-)
-def worker_cmd(concurrency: int) -> None:
-    config = load_config()
-    app = build_app(config)
-    app.run_worker(queues=[Queue.PROCESS], concurrency=concurrency)
 
 
 if __name__ == "__main__":

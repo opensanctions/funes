@@ -37,5 +37,9 @@ USER app
 # variables must be supplied at runtime (e.g. by the k8s CronJob spec).
 ENV INPUT_BASE_PATH=/app/datasets
 
-ENTRYPOINT ["funes"]
-CMD ["run"]
+# The image's long-running process is the Procrastinate worker on the
+# process queue (the review queue stays dormant until review exists).
+# One-shot funes commands override the entrypoint, e.g.
+#   podman run --entrypoint funes funes migrate
+ENTRYPOINT ["procrastinate", "-a", "funes.procrastinate.app"]
+CMD ["worker", "process"]
