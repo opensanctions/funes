@@ -12,7 +12,14 @@ Funes is an orchestrator that turns raw web pages into structured data about pol
 - **Python** 3.13+ managed by **uv**.
 - **Pravda** ([github.com/opensanctions/pravda](https://github.com/opensanctions/pravda)), published on PyPI as `opensanctions-pravda` (imported as `pravda`), for web page capture and storage, embedded as an in-process async library. Funes owns the infrastructure Pravda connects to — a headed Chrome browser (remote Playwright server), an async Postgres database, and an fsspec artifact store. Connection settings are `PRAVDA_DATABASE_URL`, `PRAVDA_BROWSER_WS_URL`, and `PRAVDA_STORAGE_BASE_PATH` (see `.env`). Funes constructs Pravda's `PravdaConfig` from worker configuration, reads artifacts from the shared storage backend over fsspec, and applies Pravda's packaged migrations (`pravda.migrate`) through the explicit `funes migrate` release command.
 - Development infrastructure is shared. Do not create ad-hoc databases or browsers for tests.
-- Funes queues extraction jobs through Procrastinate and persists each successful extraction with nested extraction-scoped persons and their positions in the PostgreSQL database shared with Pravda.
+- Funes queues extraction jobs through Procrastinate (which tracks queued/running/failed work) and the worker persists each completed Extraction with nested extraction-scoped persons and their positions in the PostgreSQL database shared with Pravda.
+
+## Page catalogue lifecycle
+
+- `funes migrate` applies the Pravda and Funes schemas, then append-only imports URL/organization associations from the configured input CSVs: missing associations may be added to an existing page, but existing records are never updated or deleted.
+- All pages are equal regardless of origin; a Page has a URL and may have zero or more organization associations. Future agent-proposed pages need not have an organization.
+- `funes enqueue` reads persisted pages and queues one job per page, passing only its `page_id`; it does not create extraction rows.
+- `funes worker` uses its configured model and persists a completed Extraction/result per page.
 
 ## Project structure
 
@@ -23,8 +30,9 @@ funes/           # the package: cli.py (migrate, enqueue, worker), tasks.py
                    # config.py
 ```
 
-`input/` (gitignored) holds the input CSVs (one dataset per file), an fsspec
-path set via `INPUT_BASE_PATH` in `.env`.
+`input/` (gitignored) holds the configured input CSVs containing
+URL/organization rows, an fsspec path set via `INPUT_BASE_PATH` in `.env`.
+Migrate imports their associations into the page catalogue.
 
 ## Conventions
 
