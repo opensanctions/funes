@@ -1,5 +1,6 @@
 """Tests for the extraction schema, prompts, and broken-page union."""
 
+import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from funes.extract import (
@@ -26,18 +27,12 @@ def test_extraction_default_kind():
 def test_broken_page_default_kind_and_reason_required():
     broken = BrokenPage(reason="Cloudflare challenge")
     assert broken.kind == "broken"
-    try:
+    with pytest.raises(ValidationError):
         BrokenPage()
-    except ValidationError:
-        pass
-    else:
-        raise AssertionError("reason must be required")
-    try:
+    with pytest.raises(ValidationError):
         BrokenPage(reason="")
-    except ValidationError:
-        pass
-    else:
-        raise AssertionError("reason must be non-empty")
+    with pytest.raises(ValidationError):
+        BrokenPage(reason="   ")
 
 
 def test_union_discriminates_on_kind():
@@ -47,20 +42,25 @@ def test_union_discriminates_on_kind():
     assert isinstance(
         result_adapter.validate_python({"kind": "broken", "reason": "404"}), BrokenPage
     )
-    try:
+    with pytest.raises(ValidationError):
         result_adapter.validate_python({"kind": "other"})
-    except ValidationError:
-        pass
-    else:
-        raise AssertionError("unknown kind must be rejected")
+
+
+def test_union_rejects_payload_missing_kind():
+    # Without kind, the discriminated union must fail loudly rather than
+    # letting the payload silently validate as an Extraction.
+    with pytest.raises(ValidationError):
+        result_adapter.validate_python({"reason": "404"})
+    with pytest.raises(ValidationError):
+        result_adapter.validate_python({"persons": []})
 
 
 def test_agent_returns_union_output_type(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test")
     agent = build_extraction_agent("gpt-5")
     assert agent.output_type is not None
-    # The agent's structured output must be the union of both result kinds.
-    assert agent.output_type == Extraction | BrokenPage
+    # The agent's structured output must be the discriminated union.
+    assert agent.output_type == PageResult
 
 
 def test_extraction_with_persons_still_valid():
@@ -97,12 +97,19 @@ def test_metadata_from_html_fields():
     assert metadata.description == "The board."
 
 
-def test_metadata_from_html_defaults_final_url_to_requested():
-    metadata = metadata_from_html("https://example.org", "<html></html>")
-    assert metadata.final_url == "https://example.org"
+def test_metadata_from_html_requires_final_url():
+    with pytest.raises(TypeError):
+        metadata_from_html("https://example.org", "<html></html>")
+
+
+def test_metadata_from_html_empty_page():
+    metadata = metadata_from_html(
+        "https://example.org", "<html></html>", final_url="https://example.org"
+    )
     assert metadata.title is None
     assert metadata.description is None
     assert metadata.http_status is None
+    assert metadata.capture_error is None
 
 
 def test_prompt_content_marks_context_and_includes_error():

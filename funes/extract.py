@@ -1,10 +1,10 @@
 """LLM extraction schema, prompts, and Pydantic AI agent construction."""
 
 import logging
-from typing import Literal
+from typing import Annotated, Literal
 
 from bs4 import BeautifulSoup
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic_ai import Agent
 
 log = logging.getLogger("funes")
@@ -234,15 +234,23 @@ class BrokenPage(BaseModel):
     kind: Literal["broken"] = "broken"
     reason: str = Field(min_length=1, description="Why the page is unusable.")
 
+    @field_validator("reason")
+    @classmethod
+    def reason_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("reason must not be blank")
+        return value
 
-PageResult = Extraction | BrokenPage
+
+PageResult = Annotated[Extraction | BrokenPage, Field(discriminator="kind")]
 
 
 def build_extraction_agent(model_name: str) -> Agent[None, PageResult]:
     """Build the reusable extraction agent for *model_name*.
 
-    Tool-based structured output into ``Extraction``; the agent has no tools
-    and cannot loop. The ``openai:`` prefix resolves to the Responses API.
+    Tool-based structured output into ``PageResult`` (an ``Extraction`` or a
+    ``BrokenPage``, discriminated by ``kind``); the agent has no tools and
+    cannot loop. The ``openai:`` prefix resolves to the Responses API.
     """
     return Agent(
         f"openai:{model_name}",
@@ -282,7 +290,8 @@ def prompt_content(metadata: PageMetadata, text: str) -> str:
 def metadata_from_html(
     requested_url: str,
     html: str,
-    final_url: str | None = None,
+    *,
+    final_url: str,
     http_status: int | None = None,
     capture_error: str | None = None,
 ) -> PageMetadata:
@@ -311,7 +320,7 @@ def metadata_from_html(
 
     return PageMetadata(
         requested_url=requested_url,
-        final_url=final_url or requested_url,
+        final_url=final_url,
         http_status=http_status,
         capture_error=capture_error,
         title=title or None,
