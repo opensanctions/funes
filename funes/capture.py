@@ -8,7 +8,7 @@ from pravda import Pravda, PravdaConfig, Snapshot
 
 from funes.config import PravdaSettings
 
-REQUIRED_ARTIFACTS = ("plaintext", "rendered_html")
+REQUIRED_ARTIFACTS = ("rendered_html",)
 
 
 def first_error_line(error: str | None) -> str | None:
@@ -25,9 +25,9 @@ def inspectability_issue(snapshot: Snapshot) -> str | None:
     """Return None if the snapshot is inspectable, else a concise reason.
 
     A snapshot is inspectable when its final URL is an absolute http(s)
-    URL and both the plaintext and rendered_html artifact paths are
-    present. HTTP status and ``snapshot.error`` do not disqualify a
-    snapshot when those artifacts exist; screenshot and HAR are optional.
+    URL and the rendered_html artifact path is present. HTTP status and
+    ``snapshot.error`` do not disqualify a snapshot when rendered_html
+    exists; plaintext, screenshot, and HAR are optional.
     """
     final_url = snapshot.final_url
     if final_url is None:
