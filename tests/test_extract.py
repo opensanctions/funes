@@ -217,15 +217,14 @@ def test_view_resource_reads_through_dependencies():
 # view_resource tool wired exactly as the worker wires them ---
 
 
-def _extraction_agent(monkeypatch):
-    # Agent construction eagerly resolves the configured OpenAI model, so a
-    # key must be present; every run below overrides the model.
-    monkeypatch.setenv("OPENAI_API_KEY", "test")
+def _extraction_agent():
+    # Every run below overrides the model, and ALLOW_MODEL_REQUESTS blocks
+    # real requests; construction only needs a syntactically present key.
     return build_extraction_agent("gpt-5")
 
 
-def test_agent_test_model_views_resource_and_extracts(monkeypatch):
-    agent = _extraction_agent(monkeypatch)
+def test_agent_test_model_views_resource_and_extracts():
+    agent = _extraction_agent()
     # TestModel generates 'a' for a string argument, so the media-type map
     # must carry that body path for the generated tool call to succeed.
     deps = _deps({"a": "image/png"}, b"\x89PNG-fake")
@@ -250,8 +249,8 @@ def test_agent_test_model_views_resource_and_extracts(monkeypatch):
     )
 
 
-def test_agent_returns_nested_extraction_graph(monkeypatch):
-    agent = _extraction_agent(monkeypatch)
+def test_agent_returns_nested_extraction_graph():
+    agent = _extraction_agent()
     person = {
         "name": "Amina Diallo",
         "countries": ["Senegal"],
@@ -289,8 +288,8 @@ def test_agent_returns_nested_extraction_graph(monkeypatch):
     assert returned.positions[0].start_date == "2021"
 
 
-def test_agent_returns_broken_page(monkeypatch):
-    agent = _extraction_agent(monkeypatch)
+def test_agent_returns_broken_page():
+    agent = _extraction_agent()
 
     def fn(messages, info):
         return ModelResponse(
