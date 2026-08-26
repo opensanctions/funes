@@ -11,7 +11,7 @@ from funes import db
 from funes.config import load_config
 from funes.migrate import migrate
 from funes.sources import load_inputs
-from funes.tasks import QUEUE_PIPELINE, TASK_PROCESS_PAGE, build_app
+from funes.tasks import Queue, Task, build_app
 
 log = logging.getLogger("funes")
 
@@ -34,7 +34,7 @@ def migrate_cmd() -> None:
         await pravda_migrate(config.pravda.database_url)
         await migrate(config.pravda.database_url)
 
-        rows = load_inputs(config.input.input_base_path)
+        rows = load_inputs(config.input.base_path)
         log.info("%d input row(s)", len(rows))
         engine = create_async_engine(config.pravda.database_url)
         try:
@@ -67,7 +67,7 @@ def enqueue_cmd() -> None:
         app = build_app(config)
         async with app.open_async():
             await app.configure_task(
-                TASK_PROCESS_PAGE, allow_unknown=False
+                Task.PROCESS_PAGE, allow_unknown=False
             ).batch_defer_async(*({"page_id": page_id} for page_id in page_ids))
         log.info("%d job(s) queued", len(page_ids))
 
@@ -75,7 +75,7 @@ def enqueue_cmd() -> None:
 
 
 @cli.command(
-    help="Consume the pipeline queue and process pages.",
+    help="Consume the process queue and process pages.",
 )
 @click.option(
     "-c",
@@ -87,7 +87,7 @@ def enqueue_cmd() -> None:
 def worker_cmd(concurrency: int) -> None:
     config = load_config()
     app = build_app(config)
-    app.run_worker(queues=[QUEUE_PIPELINE], concurrency=concurrency)
+    app.run_worker(queues=[Queue.PROCESS], concurrency=concurrency)
 
 
 if __name__ == "__main__":

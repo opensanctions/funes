@@ -8,8 +8,6 @@ from pravda import Pravda, PravdaConfig, Snapshot
 
 from funes.config import PravdaSettings
 
-REQUIRED_ARTIFACTS = ("rendered_html",)
-
 
 def first_error_line(error: str | None) -> str | None:
     """Return the first non-empty line of a capture error, or None."""
@@ -38,10 +36,8 @@ def inspectability_issue(snapshot: Snapshot) -> str | None:
             reason = f"final URL is not an absolute http(s) URL: {final_url!r}"
         else:
             reason = None
-    if reason is None:
-        missing = [name for name in REQUIRED_ARTIFACTS if not getattr(snapshot, name)]
-        if missing:
-            reason = f"missing artifact(s): {', '.join(missing)}"
+    if reason is None and not snapshot.rendered_html:
+        reason = "missing artifact(s): rendered_html"
     if reason is None:
         return None
     if snapshot.error:
@@ -66,7 +62,7 @@ def pravda_client(settings: PravdaSettings) -> Pravda:
     return Pravda(config)
 
 
-def storage_filesystem(settings: PravdaSettings):
+def artifact_filesystem(settings: PravdaSettings):
     """Return the async fsspec backend shared with Pravda.
 
     Synchronous backends are wrapped so all artifact reads stay on the current

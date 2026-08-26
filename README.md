@@ -88,7 +88,7 @@ produce another historical Extraction for it. Pages whose snapshot is
 non-inspectable, or whose model output is a `BrokenPage`, get no Extraction
 row; instead the pipeline defers one review job
 (`funes.review_broken_page`, carrying page, snapshot, run, and reason) to a
-separate `broken` queue that the normal `funes worker` does not consume, so
+separate `review` queue that the normal `funes worker` does not consume, so
 those jobs sit pending until review is implemented.
 
 Queued, running, and failed work is tracked by

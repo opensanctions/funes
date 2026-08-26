@@ -22,7 +22,7 @@ class ModelConfig:
 
 @dataclass(frozen=True)
 class InputConfig:
-    input_base_path: str
+    base_path: str
 
 
 @dataclass(frozen=True)
@@ -49,7 +49,7 @@ def load_config() -> Config:
         ),
         model=ModelConfig(name=os.environ["OPENAI_MODEL"]),
         input=InputConfig(
-            input_base_path=os.environ["INPUT_BASE_PATH"],
+            base_path=os.environ["INPUT_BASE_PATH"],
         ),
         sessions=SessionsConfig(
             base_path=os.environ["SESSIONS_BASE_PATH"],

@@ -2,6 +2,7 @@
 
 import logging
 import uuid
+from enum import StrEnum
 from functools import partial
 
 from procrastinate import App, PsycopgConnector
@@ -10,29 +11,38 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from funes import db
 from funes.capture import (
+    artifact_filesystem,
     first_error_line,
     inspectability_issue,
     pravda_client,
     read_artifact,
-    storage_filesystem,
 )
 from funes.config import Config
 from funes.extract import (
     BrokenPage,
     ExtractionDependencies,
     build_extraction_agent,
+    build_prompt,
     metadata_from_html,
-    prompt_content,
 )
 from funes.outline import build_outline, har_resource_media_types
 from funes.sessions import session_path, write_session
 
 log = logging.getLogger("funes")
 
-QUEUE_PIPELINE = "pipeline"
-QUEUE_BROKEN = "broken"
-TASK_PROCESS_PAGE = "funes.process_page"
-TASK_REVIEW_BROKEN_PAGE = "funes.review_broken_page"
+
+class Queue(StrEnum):
+    """Procrastinate queues, named for the work they carry."""
+
+    PROCESS = "process"
+    REVIEW = "review"
+
+
+class Task(StrEnum):
+    """Registered Procrastinate task names."""
+
+    PROCESS_PAGE = "funes.process_page"
+    REVIEW_BROKEN_PAGE = "funes.review_broken_page"
 
 
 def build_app(config: Config) -> App:
@@ -48,7 +58,7 @@ def build_app(config: Config) -> App:
     )
     app: App = App(connector=PsycopgConnector(conninfo=dsn))
 
-    @app.task(name=TASK_REVIEW_BROKEN_PAGE, queue=QUEUE_BROKEN)
+    @app.task(name=Task.REVIEW_BROKEN_PAGE, queue=Queue.REVIEW)
     async def review_broken_page(
         page_id: str, snapshot_id: str, run_id: str, reason: str
     ) -> None:
@@ -57,14 +67,14 @@ def build_app(config: Config) -> App:
             f"(page {page_id}, snapshot {snapshot_id}, run {run_id})"
         )
 
-    @app.task(name=TASK_PROCESS_PAGE, queue=QUEUE_PIPELINE)
+    @app.task(name=Task.PROCESS_PAGE, queue=Queue.PROCESS)
     async def process_page(page_id: str) -> None:
         """Capture one Page's URL and store the extraction result.
 
-        Procrastinate is the pending/running/failure ledger; the database only ever sees
-        committed successful extraction graphs. Broken pages are routed to
-        a dormant review queue whose payload (page, snapshot, run, reason)
-        is the durable routing record.
+        Procrastinate is the pending/running/failure ledger; the database only
+        ever sees committed successful extraction graphs. Broken pages are
+        routed to a dormant review queue whose payload (page, snapshot, run,
+        reason) is the durable routing record.
         """
         # The model comes from worker configuration, never from the queue
         # payload; the extraction UUID is generated here to identify the run.
@@ -77,11 +87,12 @@ def build_app(config: Config) -> App:
                 page = await session.get(db.Page, uuid.UUID(page_id))
                 if page is None:
                     raise LookupError(f"page {page_id} not found")
-                page_pk, url = page.id, page.url
-                # Close the read transaction before capture and LLM work.
+                url = page.url
+                # End the read transaction before capture and LLM work;
+                # expire_on_commit=False keeps the loaded attributes alive.
                 await session.commit()
 
-                fs = storage_filesystem(config.pravda)
+                fs = artifact_filesystem(config.pravda)
                 pravda = pravda_client(config.pravda)
                 async with pravda:
                     snapshot = await pravda.snapshot(url)
@@ -116,7 +127,7 @@ def build_app(config: Config) -> App:
                 log.info("%s → extracting …", snapshot.final_url)
                 agent = build_extraction_agent(model)
                 result = await agent.run(
-                    prompt_content(metadata, outline),
+                    build_prompt(metadata, outline),
                     run_id=str(extraction_id),
                     deps=deps,
                 )
@@ -146,7 +157,7 @@ def build_app(config: Config) -> App:
                 db.store_extraction(
                     session,
                     extraction_id=extraction_id,
-                    page_id=page_pk,
+                    page_id=page.id,
                     model=model,
                     snapshot=snapshot,
                     result=extraction_result,

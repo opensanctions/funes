@@ -1,13 +1,47 @@
 """Tests for the snapshot inspectability boundary."""
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 
+import fsspec
 from pravda import Snapshot
 
-from funes.capture import inspectability_issue
+from funes.capture import (
+    artifact_filesystem,
+    first_error_line,
+    inspectability_issue,
+    read_artifact,
+)
+from funes.config import PravdaSettings
 
 NOW = datetime(2025, 1, 1, tzinfo=UTC)
+
+
+def test_first_error_line():
+    assert first_error_line(None) is None
+    assert first_error_line("\n \n") is None
+    assert first_error_line("TimeoutError: x") == "TimeoutError: x"
+    # Playwright errors prefix a blank line before the first log line.
+    assert first_error_line("\nTimeoutError: x\nsecond line") == "TimeoutError: x"
+
+
+def make_settings(storage_base_path: str) -> PravdaSettings:
+    return PravdaSettings(
+        database_url="postgresql+asyncpg://funes:funes@localhost/funes",
+        browser_ws_url="ws://localhost:3000",
+        storage_base_path=storage_base_path,
+    )
+
+
+def test_read_artifact_reads_bytes_through_async_fs():
+    base = f"/funes-{uuid.uuid4().hex}"
+    fs = artifact_filesystem(make_settings(f"memory://{base}"))
+    fsspec.filesystem("memory").pipe_file(f"{base}/page.html", b"<html>rendered</html>")
+
+    assert (
+        asyncio.run(read_artifact(fs, f"{base}/page.html")) == b"<html>rendered</html>"
+    )
 
 
 def make_snapshot(**overrides) -> Snapshot:

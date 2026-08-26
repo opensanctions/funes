@@ -13,9 +13,9 @@ from pydantic_ai.messages import (
     ToolReturnPart,
 )
 from pydantic_ai.models.function import FunctionModel
+from pydantic_ai.models.test import TestModel
 
 from funes.extract import (
-    SUPPORTED_MEDIA_TYPES,
     BrokenPage,
     Extraction,
     ExtractionDependencies,
@@ -24,18 +24,12 @@ from funes.extract import (
     Person,
     Position,
     build_extraction_agent,
+    build_prompt,
     metadata_from_html,
-    prompt_content,
     view_resource,
 )
 
 result_adapter = TypeAdapter(PageResult)
-
-
-def test_extraction_default_kind():
-    extraction = Extraction()
-    assert extraction.kind == "extraction"
-    assert extraction.persons == []
 
 
 def test_broken_page_default_kind_and_reason_required():
@@ -67,20 +61,6 @@ def test_union_rejects_payload_missing_kind():
         result_adapter.validate_python({"reason": "404"})
     with pytest.raises(ValidationError):
         result_adapter.validate_python({"persons": []})
-
-
-def test_agent_returns_union_output_type(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "test")
-    agent = build_extraction_agent("gpt-5")
-    assert agent.output_type is not None
-    # The agent's structured output must be the discriminated union.
-    assert agent.output_type == PageResult
-
-
-def test_supported_media_types_are_images_only():
-    assert SUPPORTED_MEDIA_TYPES == frozenset(
-        {"image/jpeg", "image/png", "image/webp", "image/gif"}
-    )
 
 
 def _view_agent(function):
@@ -233,13 +213,100 @@ def test_view_resource_reads_through_dependencies():
     assert returns[0].content == BinaryContent(b"pngdata", media_type="image/png")
 
 
-def test_extraction_dependencies_is_frozen():
-    async def read_resource(body_path: str) -> bytes:
-        return b""
+# --- full runs of the real extraction agent, its output union, and the
+# view_resource tool wired exactly as the worker wires them ---
 
-    deps = ExtractionDependencies(read_resource=read_resource, resource_media_types={})
-    with pytest.raises(AttributeError):
-        deps.read_resource = read_resource  # type: ignore[misc]
+
+def _extraction_agent(monkeypatch):
+    # Agent construction eagerly resolves the configured OpenAI model, so a
+    # key must be present; every run below overrides the model.
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    return build_extraction_agent("gpt-5")
+
+
+def test_agent_test_model_views_resource_and_extracts(monkeypatch):
+    agent = _extraction_agent(monkeypatch)
+    # TestModel generates 'a' for a string argument, so the media-type map
+    # must carry that body path for the generated tool call to succeed.
+    deps = _deps({"a": "image/png"}, b"\x89PNG-fake")
+    with agent.override(model=TestModel()):
+        result = asyncio.run(agent.run("ignored prompt", deps=deps))
+
+    assert result.output == Extraction(persons=[])
+    parts = _tool_return_part(result)
+    [call] = [
+        p
+        for p in parts
+        if isinstance(p, ToolCallPart) and p.tool_name == "view_resource"
+    ]
+    assert call.args == {"body_path": "a"}
+    [image_return] = [
+        p
+        for p in parts
+        if isinstance(p, ToolReturnPart) and p.tool_name == "view_resource"
+    ]
+    assert image_return.content == BinaryContent(
+        b"\x89PNG-fake", media_type="image/png"
+    )
+
+
+def test_agent_returns_nested_extraction_graph(monkeypatch):
+    agent = _extraction_agent(monkeypatch)
+    person = {
+        "name": "Amina Diallo",
+        "countries": ["Senegal"],
+        "positions": [
+            {
+                "name": "Director",
+                "organization": "Example Foundation",
+                "start_date": "2021",
+            },
+            {"name": "Chair", "organization": "Example Foundation"},
+        ],
+    }
+
+    def fn(messages, info):
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    "final_result_Extraction",
+                    {"kind": "extraction", "persons": [person]},
+                )
+            ]
+        )
+
+    with agent.override(model=FunctionModel(fn)):
+        result = asyncio.run(agent.run("ignored prompt", deps=_deps({})))
+
+    assert isinstance(result.output, Extraction)
+    [returned] = result.output.persons
+    assert isinstance(returned, Person)
+    assert returned.name == "Amina Diallo"
+    assert returned.countries == ["Senegal"]
+    assert [p.name for p in returned.positions] == ["Director", "Chair"]
+    assert isinstance(returned.positions[0], Position)
+    assert returned.positions[0].organization == "Example Foundation"
+    assert returned.positions[0].start_date == "2021"
+
+
+def test_agent_returns_broken_page(monkeypatch):
+    agent = _extraction_agent(monkeypatch)
+
+    def fn(messages, info):
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    "final_result_BrokenPage",
+                    {"kind": "broken", "reason": "Cloudflare challenge"},
+                )
+            ]
+        )
+
+    with agent.override(model=FunctionModel(fn)):
+        result = asyncio.run(agent.run("ignored prompt", deps=_deps({})))
+
+    assert isinstance(result.output, BrokenPage)
+    assert result.output.reason == "Cloudflare challenge"
 
 
 def test_extraction_with_persons_still_valid():
@@ -291,7 +358,7 @@ def test_metadata_from_html_empty_page():
     assert metadata.capture_error is None
 
 
-def test_prompt_content_marks_context_and_includes_error():
+def test_build_prompt_marks_context_and_includes_error():
     metadata = PageMetadata(
         requested_url="https://example.org/x",
         final_url="https://example.org/y",
@@ -301,7 +368,7 @@ def test_prompt_content_marks_context_and_includes_error():
         description=None,
     )
     outline = '- main:\n  - h1 "Board"\n  - img "logo" [src=https://example.org/l.png] [body=bodies/l.png]'
-    prompt = prompt_content(metadata, outline)
+    prompt = build_prompt(metadata, outline)
     assert "Requested URL (context only): https://example.org/x" in prompt
     assert "Final URL (context only): https://example.org/y" in prompt
     assert "HTTP status (context only): 503" in prompt
@@ -312,14 +379,14 @@ def test_prompt_content_marks_context_and_includes_error():
     assert "<page_text>" not in prompt
 
 
-def test_prompt_content_omits_absent_optional_fields():
+def test_build_prompt_omits_absent_optional_fields():
     metadata = PageMetadata(
         requested_url="https://example.org",
         final_url="https://example.org",
         title=None,
         description=None,
     )
-    prompt = prompt_content(metadata, '- text: "empty"')
+    prompt = build_prompt(metadata, '- text: "empty"')
     assert "Capture error" not in prompt
     assert "HTTP status (context only): [not provided]" in prompt
     assert '<page_outline>\n- text: "empty"\n</page_outline>' in prompt

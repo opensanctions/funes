@@ -11,15 +11,10 @@ from pydantic_ai import Agent, BinaryContent, ModelRetry, RunContext
 
 log = logging.getLogger("funes")
 
-AGENT_NAME = "extraction"
-THINKING = "low"
-
 # The only media types the view_resource tool can return to the model.
-SUPPORTED_MEDIA_TYPES = frozenset(
-    {"image/jpeg", "image/png", "image/webp", "image/gif"}
-)
+VIEWABLE_MEDIA_TYPES = frozenset({"image/jpeg", "image/png", "image/webp", "image/gif"})
 
-_INSTRUCTIONS_HEAD = """\
+_EXTRACTION_INSTRUCTIONS = """\
 # Role
 
 You extract person-position relationships from one web page and return
@@ -306,10 +301,10 @@ async def view_resource(
             "paths of resources stored in the snapshot's HTTP archive can be "
             "viewed"
         )
-    if media_type not in SUPPORTED_MEDIA_TYPES:
+    if media_type not in VIEWABLE_MEDIA_TYPES:
         raise ModelRetry(
             f"resource {body_path!r} has media type {media_type!r}, which "
-            "cannot be viewed; only " + ", ".join(sorted(SUPPORTED_MEDIA_TYPES))
+            "cannot be viewed; only " + ", ".join(sorted(VIEWABLE_MEDIA_TYPES))
         )
     data = await ctx.deps.read_resource(body_path)
     return BinaryContent(data, media_type=media_type)
@@ -329,17 +324,17 @@ def build_extraction_agent(
     """
     return Agent(
         f"openai:{model_name}",
-        name=AGENT_NAME,
+        name="extraction",
         output_type=PageResult,
-        instructions=_INSTRUCTIONS_HEAD,
-        model_settings={"thinking": THINKING},
+        instructions=_EXTRACTION_INSTRUCTIONS,
+        model_settings={"thinking": "low"},
         deps_type=ExtractionDependencies,
         tools=[view_resource],
     )
 
 
-def prompt_content(metadata: PageMetadata, outline: str) -> str:
-    """Build the outline+metadata prompt source for one page.
+def build_prompt(metadata: PageMetadata, outline: str) -> str:
+    """Build the user prompt for one page: metadata context and the outline.
 
     Returns the ``<page_metadata>`` / ``<page_outline>`` source block that
     carries the page metadata slice and the full DOM outline.
