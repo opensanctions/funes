@@ -1,10 +1,52 @@
 """Pravda capture integration and shared artifact storage access."""
 
+from urllib.parse import urlparse
+
 import fsspec
 from fsspec.implementations.asyn_wrapper import AsyncFileSystemWrapper
-from pravda import Pravda, PravdaConfig
+from pravda import Pravda, PravdaConfig, Snapshot
 
 from funes.config import PravdaSettings
+
+REQUIRED_ARTIFACTS = ("plaintext", "rendered_html")
+
+
+def inspectability_issue(snapshot: Snapshot) -> str | None:
+    """Return None if the snapshot is inspectable, else a concise reason.
+
+    A snapshot is inspectable when its final URL is an absolute http(s)
+    URL and both the plaintext and rendered_html artifact paths are
+    present. HTTP status and ``snapshot.error`` do not disqualify a
+    snapshot when those artifacts exist; screenshot and HAR are optional.
+    """
+    final_url = snapshot.final_url
+    if final_url is None:
+        reason = "no final URL"
+    else:
+        parsed = urlparse(final_url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            reason = f"final URL is not an absolute http(s) URL: {final_url!r}"
+        else:
+            reason = None
+    if reason is None:
+        missing = [name for name in REQUIRED_ARTIFACTS if not getattr(snapshot, name)]
+        if missing:
+            reason = f"missing artifact(s): {', '.join(missing)}"
+    if reason is None:
+        return None
+    if snapshot.error:
+        # Playwright errors are multiline logs; keep only the first line.
+        diagnostics = next(
+            (line.strip() for line in snapshot.error.splitlines() if line.strip()),
+            None,
+        )
+    elif snapshot.http_status is not None and snapshot.http_status >= 400:
+        diagnostics = f"http status {snapshot.http_status}"
+    else:
+        diagnostics = None
+    if diagnostics:
+        return f"{reason} ({diagnostics})"
+    return reason
 
 
 def pravda_client(settings: PravdaSettings) -> Pravda:
