@@ -14,20 +14,12 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from funes import db
-from funes.capture import (
-    is_blank,
-    pravda_client,
-    read_artifact,
-    split_image,
-    storage_filesystem,
-)
+from funes.capture import pravda_client, read_artifact, storage_filesystem
 from funes.config import Config
 from funes.extract import (
-    _INSTRUCTIONS_WITH_SCREENSHOT,
     build_extraction_agent,
     metadata_from_html,
     prompt_content,
-    screenshot_reason,
 )
 from funes.sessions import session_path, write_session
 
@@ -90,23 +82,10 @@ def build_app(config: Config) -> App:
                 )
 
                 log.info("%s → extracting …", snapshot.url)
-                tiles: list[bytes] = []
-                reason = screenshot_reason(text, html)
-                if reason is not None:
-                    log.info("  → %s → including screenshot", reason)
-                    if snapshot.screenshot is not None:
-                        blob = await read_artifact(fs, snapshot.screenshot)
-                        if not is_blank(blob):
-                            tiles = split_image(
-                                blob,
-                                config.image.tile_size,
-                                config.image.tile_overlap,
-                            )
                 agent = build_extraction_agent(extraction.model)
                 result = await agent.run(
-                    prompt_content(metadata_from_html(snapshot.url, html), text, tiles),
+                    prompt_content(metadata_from_html(snapshot.url, html), text),
                     run_id=extraction_id,
-                    instructions=_INSTRUCTIONS_WITH_SCREENSHOT if tiles else None,
                 )
                 extraction_result = result.output
                 log.info(
