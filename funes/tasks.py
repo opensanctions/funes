@@ -1,10 +1,4 @@
-"""Procrastinate wiring: the app factory and the single pipeline task.
-
-``build_app`` owns both the app and its one task, so the whole pipeline —
-load the Extraction, capture the URL with Pravda, run the extraction agent,
-persist the result — reads top to bottom inside the task body. Any failure
-raises; the job simply fails. No retries, no fallback.
-"""
+"""Procrastinate app and capture/extraction pipeline task."""
 
 import logging
 import uuid
@@ -30,11 +24,7 @@ TASK_PROCESS_EXTRACTION = "funes.process_extraction"
 
 
 def build_app(config: Config) -> App:
-    """Construct the Procrastinate app with Funes's single pipeline task.
-
-    Takes an already-loaded Config so no env vars are read at import time;
-    calling this repeatedly yields equivalent, independent apps.
-    """
+    """Construct the Procrastinate app and register its pipeline task."""
     dsn = (
         make_url(config.pravda.database_url)
         .set(drivername="postgresql")

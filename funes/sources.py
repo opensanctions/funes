@@ -1,8 +1,4 @@
-"""Source ingestion: read input CSVs into typed rows.
-
-Each CSV under the input directory is its own dataset, named after the file
-stem. Rows with a blank URL are dropped.
-"""
+"""Read input CSV datasets into typed rows."""
 
 import csv
 import os
@@ -19,12 +15,9 @@ class InputRow(BaseModel):
 
 
 def load_inputs(base_path: str) -> list[tuple[str, list[InputRow]]]:
-    """Load every CSV under the input directory as a (dataset, rows) pair.
+    """Load CSV files as ``(dataset, rows)`` pairs from an fsspec path.
 
-    *base_path* is an fsspec URL (local dir or ``gs://``/``s3://`` prefix).
-    Each CSV becomes its own dataset, named after the file's stem; rows with
-    a blank URL are dropped. Files are read straight from the bucket without
-    a local copy.
+    Each file stem names a dataset, and rows with blank URLs are omitted.
     """
     fs, base = fsspec.core.url_to_fs(base_path)
     result: list[tuple[str, list[InputRow]]] = []

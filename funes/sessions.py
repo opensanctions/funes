@@ -1,11 +1,4 @@
-"""Write-only persistence of extraction agent sessions as JSON files.
-
-Each session is one file named ``{run_id}.json`` (one successful extraction
-↔ one agent session, ``run_id`` being the extraction id). The body is a
-single JSON array of ``ModelMessage`` objects in pydantic-ai's documented
-persistence format, written with ``ModelMessagesTypeAdapter`` and read back
-with the same adapter; this module only writes.
-"""
+"""Persist extraction agent message histories as JSON files."""
 
 import os
 

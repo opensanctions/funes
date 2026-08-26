@@ -1,40 +1,14 @@
-"""On-demand DOM outline for model consumption.
+"""Build compact, model-facing outlines from rendered HTML.
 
-``build_outline`` derives a compact, YAML-ish outline of a Pravda snapshot's
-rendered HTML, in the spirit of Playwright's AI aria snapshot but built on the
-rendered DOM itself: nodes carry their element names, so every resource stays
-at its actual DOM position and in document order.
+The output preserves DOM order while removing empty elements and collapsing
+single-child wrappers. Links and images retain resolved resource URLs, and
+images may include paths to bodies stored in the snapshot's HAR.
 
-Line grammar (two-space indent, one line per node)::
+Example::
 
-    - tag "leading text" [attr=value] [attr=value]:
-      - text: "text interleaved with child elements"
-      - child ...
-
-- The quoted name is the element's own contiguous leading text. Text runs
-  interleaved with child elements stay in place as ``- text:`` lines, so
-  document order is preserved exactly.
-- Singular wrappers collapse: an element whose retained content is exactly
-  one child and that contributes no text or attributes of its own is
-  replaced by that child (bottom-up), so chains of single-purpose containers
-  (``div > div > div``) leave no trace. Elements that carry a link, an image,
-  or text never collapse.
-- Every ``<img>`` is retained — linked or unlinked, with or without alt text,
-  empty alt included (``[alt=]``). Nothing is treated as invisible:
-  ``hidden`` and ``aria-hidden`` subtrees stay in the outline. ``src``/``href``
-  values are resolved against the page URL with exact ``urljoin`` semantics;
-  nothing is guessed.
-- An image whose resolved URL exactly matches a HAR entry with a stored body
-  is annotated ``[body=<path>]`` with the ``content._file`` value from the
-  snapshot's resolved HTTP archive (Pravda rewrites it to a full storage
-  path over the shared artifact store).
-
-Deliberately unsupported: ARIA roles and computed names (element names only),
-``srcset``/``<picture>``/``<source>`` resolution (``src`` only, so a responsive
-image shows its fallback URL and may miss the ``body`` of the variant the
-browser actually loaded), and any HAR matching beyond exact request-URL
-equality. The outline is derived on demand from artifacts the caller already
-holds; nothing is persisted.
+    - main:
+      - h1 "Title"
+      - a "Details" [href=https://example.com/details]
 """
 
 import json

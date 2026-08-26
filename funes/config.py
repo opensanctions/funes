@@ -1,12 +1,4 @@
-"""Typed configuration, loaded once at the CLI boundary.
-
-Settings are read here from the environment, never scattered as
-``os.environ`` lookups through the business logic. Grouped frozen dataclasses
-keep each subsystem's needs explicit, so a caller is handed only the slice it
-uses (e.g. extraction gets ``ModelConfig``, not the whole
-config). ``load_config()`` is the single entry point and owns
-``load_dotenv()``; importing this module has no side effects.
-"""
+"""Typed application configuration loaded from the environment."""
 
 import os
 from dataclasses import dataclass
@@ -16,11 +8,7 @@ from dotenv import load_dotenv
 
 @dataclass(frozen=True)
 class PravdaSettings:
-    """Environment-backed settings for Pravda's in-process async client.
-
-    These three values are handed to Pravda's own ``PravdaConfig`` at the
-    application boundary. The database URL is also used by Funes.
-    """
+    """Connection settings for Pravda and its shared infrastructure."""
 
     database_url: str
     browser_ws_url: str

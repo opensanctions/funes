@@ -1,14 +1,4 @@
-"""LLM extraction of position holders from a single page, via a Pydantic AI
-agent.
-
-Owns the structured-output schema (``Person`` / ``Position`` /
-``Extraction``), page metadata derivation, the model instructions, the
-``Agent`` factory (``build_extraction_agent``), and the text+metadata
-prompt source (``prompt_content``).
-
-The agent is built at the application boundary and is reusable across runs;
-it holds no module-global state.
-"""
+"""LLM extraction schema, prompts, and Pydantic AI agent construction."""
 
 import logging
 
