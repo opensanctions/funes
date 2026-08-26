@@ -66,6 +66,33 @@ cases:
     url: https://www.aia.example.org/elecciones
   expected_output:
     kind: extraction
+- name: conjoined_role_misattribution
+  inputs:
+    fixture: conjoined_role_misattribution
+    url: https://www.vu.example.org/en/chairperson
+  expected_output:
+    kind: extraction
+    persons:
+    - name: Adama Kessi
+      positions:
+      - name: Chairperson of the Veltrane Union
+        organization: Veltrane Union
+    - name: Boris Tavernier
+      positions:
+      - name: President of the Republic of Kestria
+        jurisdiction: Republic of Kestria
+    - name: Omar Nasri
+      positions:
+      - name: President of the Republic of Dahab
+        jurisdiction: Republic of Dahab
+      - name: Chairperson of the Veltrane Union
+        organization: Veltrane Union
+    - name: Lucas Marek
+      positions:
+      - name: Prime Minister of the Republic of Ostrava
+        jurisdiction: Republic of Ostrava
+      - name: Chairperson of the Veltrane Union
+        organization: Veltrane Union
 - name: board_member_cards
   inputs:
     fixture: board_member_cards
