@@ -66,6 +66,12 @@ cases:
     url: https://www.aia.example.org/elecciones
   expected_output:
     kind: extraction
+- name: nav_menu_hallucination
+  inputs:
+    fixture: nav_menu_hallucination
+    url: https://www.maresia.example.org/o-compacto/organizacao
+  expected_output:
+    kind: extraction
 - name: board_member_cards
   inputs:
     fixture: board_member_cards
