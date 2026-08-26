@@ -29,11 +29,19 @@ class Extraction(Base):
 
     __tablename__ = "extraction"
     __table_args__ = (
+        # A row is either fully pending (all outcome columns null) or fully
+        # processed (snapshot, capture, and processing timestamps present with
+        # a valid outcome); 'extracted' forbids broken_reason, 'broken'
+        # requires it.
         CheckConstraint(
-            "(snapshot_id IS NULL AND captured_at IS NULL AND extracted_at IS NULL) OR "
-            "(snapshot_id IS NOT NULL AND captured_at IS NOT NULL "
-            "AND extracted_at IS NOT NULL)",
-            name="extraction_timestamps",
+            "(snapshot_id IS NULL AND captured_at IS NULL AND outcome IS NULL "
+            "AND processed_at IS NULL AND broken_reason IS NULL) "
+            "OR (snapshot_id IS NOT NULL AND captured_at IS NOT NULL "
+            "AND processed_at IS NOT NULL "
+            "AND outcome IN ('extracted', 'broken') "
+            "AND (outcome <> 'extracted' OR broken_reason IS NULL) "
+            "AND (outcome <> 'broken' OR broken_reason IS NOT NULL))",
+            name="extraction_outcome",
         ),
     )
 
@@ -45,7 +53,9 @@ class Extraction(Base):
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
     captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    extracted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    outcome: Mapped[str | None] = mapped_column(Text)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    broken_reason: Mapped[str | None] = mapped_column(Text)
 
     pages: Mapped[list["Page"]] = relationship(
         back_populates="extraction", cascade="all, delete-orphan"
@@ -139,7 +149,8 @@ def extraction_succeeded(
     """Store a successful extraction and its nested person/position graph."""
     extraction.snapshot_id = snapshot.id
     extraction.captured_at = snapshot.captured_at
-    extraction.extracted_at = datetime.now(UTC)
+    extraction.outcome = "extracted"
+    extraction.processed_at = datetime.now(UTC)
     session.add_all(
         Person(
             extraction_id=extraction.id,
@@ -161,3 +172,17 @@ def extraction_succeeded(
         )
         for person in result.persons
     )
+
+
+def extraction_broken(
+    session: AsyncSession,
+    extraction: Extraction,
+    snapshot: Snapshot,
+    reason: str,
+) -> None:
+    """Record a capture/extraction failure: outcome metadata only, no persons."""
+    extraction.snapshot_id = snapshot.id
+    extraction.captured_at = snapshot.captured_at
+    extraction.outcome = "broken"
+    extraction.processed_at = datetime.now(UTC)
+    extraction.broken_reason = reason
