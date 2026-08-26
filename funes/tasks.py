@@ -2,6 +2,7 @@
 
 import logging
 import uuid
+from functools import partial
 
 from procrastinate import App, PsycopgConnector
 from sqlalchemy.engine import make_url
@@ -18,10 +19,12 @@ from funes.capture import (
 from funes.config import Config
 from funes.extract import (
     BrokenPage,
+    ExtractionDependencies,
     build_extraction_agent,
     metadata_from_html,
     prompt_content,
 )
+from funes.outline import build_outline, har_resource_media_types
 from funes.sessions import session_path, write_session
 
 log = logging.getLogger("funes")
@@ -94,7 +97,6 @@ def build_app(config: Config) -> App:
                     log.info("%s → broken: %s", url, issue)
                     return
 
-                text = (await read_artifact(fs, snapshot.plaintext)).decode("utf-8")
                 html = (await read_artifact(fs, snapshot.rendered_html)).decode("utf-8")
 
                 metadata = metadata_from_html(
@@ -104,11 +106,19 @@ def build_app(config: Config) -> App:
                     http_status=snapshot.http_status,
                     capture_error=first_error_line(snapshot.error),
                 )
+                outline = build_outline(snapshot.final_url, html, snapshot.http_archive)
+                deps = ExtractionDependencies(
+                    read_resource=partial(read_artifact, fs),
+                    resource_media_types=har_resource_media_types(
+                        snapshot.http_archive
+                    ),
+                )
                 log.info("%s → extracting …", snapshot.final_url)
                 agent = build_extraction_agent(model)
                 result = await agent.run(
-                    prompt_content(metadata, text),
+                    prompt_content(metadata, outline),
                     run_id=str(extraction_id),
+                    deps=deps,
                 )
                 session_file = session_path(
                     config.sessions.base_path, str(extraction_id)
