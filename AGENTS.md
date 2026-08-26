@@ -21,8 +21,6 @@ funes/           # the package: cli.py (migrate, enqueue, worker), tasks.py
                    # (Procrastinate app + pipeline task), capture.py (Pravda
                    # client + artifact helpers), extract.py, db.py, sources.py,
                    # config.py
-evaluate.py        # score the extraction pipeline against synthetic fixtures
-fixtures/          # one directory per fixture: page.html, expected.json, optional screenshot.png
 ```
 
 `input/` (gitignored) holds the input CSVs (one dataset per file), an fsspec
@@ -45,22 +43,6 @@ uv sync
 # Run a script
 uv run python some_script.py
 ```
-
-## Evaluation
-
-Score the extraction pipeline against hand-authored fixture pages. Each
-fixture is a directory under `fixtures/` holding `page.html`, an
-`expected.json` answer key, and an optional `screenshot.png` that drives the
-image path. The harness derives the plaintext the model reads, runs the real
-`extract()`, and scores the returned (human, position) pairs by exact string
-equality.
-
-```bash
-uv run python evaluate.py   # run all fixtures
-uv run python evaluate.py -v # show expected pairs
-```
-
-See `evaluate.py`'s docstring for the fixture set and options.
 
 ## Linting and formatting
 

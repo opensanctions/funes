@@ -75,12 +75,3 @@ uv run funes worker                     # run a worker that executes queued jobs
 Work is queued through [Procrastinate](https://procrastinate.readthedocs.io/),
 a Postgres-backed job queue that reuses the same database (no new
 environment variables — it connects through `PRAVDA_DATABASE_URL`).
-
-## Evaluation
-
-Score the extraction pipeline against hand-authored fixture pages. Each fixture is a directory under `fixtures/` holding `page.html`, an `expected.json` answer key, and optional `screenshot.png` and `url.txt` inputs. The harness derives page text and metadata, runs the real `extract()`, and exact-scores the returned holding observations. See `evaluate.py`'s docstring for details.
-
-```bash
-uv run python evaluate.py   # run all fixtures
-uv run python evaluate.py -v # show expected pairs
-```

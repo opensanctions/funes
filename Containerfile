@@ -25,11 +25,10 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
 COPY funes ./funes
-COPY evaluate.py README.md ./
+COPY README.md ./
 RUN uv sync --frozen --no-dev
 
 COPY datasets ./datasets
-COPY fixtures ./fixtures
 
 RUN chown -R app:app /app /opt/venv
 USER app
