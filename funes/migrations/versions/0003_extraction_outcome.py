@@ -50,8 +50,8 @@ def downgrade() -> None:
     op.drop_column("extraction", "outcome")
     op.alter_column("extraction", "processed_at", new_column_name="extracted_at")
     op.create_check_constraint(
-        "extraction",
         "extraction_timestamps",
+        "extraction",
         "(snapshot_id IS NULL AND captured_at IS NULL AND extracted_at IS NULL) "
         "OR (snapshot_id IS NOT NULL AND captured_at IS NOT NULL "
         "AND extracted_at IS NOT NULL)",
