@@ -146,6 +146,67 @@ dataset = Dataset[FixtureInput, PageResult, None](
                 ]
             ),
         ),
+        Case(
+            name="roster_table",
+            inputs=FixtureInput(
+                fixture="roster_table",
+                url="https://www.lbc.example.org/governance/delegates",
+            ),
+            expected_output=Extraction(
+                persons=[
+                    Person(
+                        name="Ms. Ingrid Halloway",
+                        positions=[
+                            Position(
+                                name="Delegate",
+                                organization="Lakes Basin Commission",
+                                start_date="Mar, 2024",
+                            )
+                        ],
+                    ),
+                    Person(
+                        name="Mr. Peter Oskanson",
+                        positions=[
+                            Position(
+                                name="Alternate",
+                                organization="Lakes Basin Commission",
+                                start_date="Mar, 2024",
+                            )
+                        ],
+                    ),
+                    Person(
+                        name="Dr. Marta Velling",
+                        positions=[
+                            Position(
+                                name="Delegate",
+                                organization="Lakes Basin Commission",
+                                start_date="Jun, 2025",
+                            )
+                        ],
+                    ),
+                    Person(
+                        name="Mrs. Rosa Delacampra",
+                        positions=[
+                            Position(
+                                name="Alternate",
+                                organization="Lakes Basin Commission",
+                                start_date="Jun, 2025",
+                            )
+                        ],
+                    ),
+                    Person(
+                        name="Mr. Anders Quill",
+                        positions=[
+                            Position(
+                                name="Delegate",
+                                organization="Lakes Basin Commission",
+                                start_date="Jan, 2026",
+                            )
+                        ],
+                    ),
+                ]
+            ),
+        ),
     ],
     evaluators=[ExtractionF1()],
 )
