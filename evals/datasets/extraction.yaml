@@ -53,5 +53,11 @@ cases:
   expected_output:
     kind: broken
     reason: Bot-detection security challenge interstitial ("Just a moment...", "verifies you are not a bot"); no usable source content.
+- name: elections_no_holders
+  inputs:
+    fixture: elections_no_holders
+    url: https://www.aia.example.org/elecciones
+  expected_output:
+    kind: extraction
 evaluators:
 - ExtractionF1
