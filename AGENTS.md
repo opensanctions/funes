@@ -13,11 +13,11 @@ Funes turns raw web pages into structured data about political position holders.
 ```bash
 uv sync                  # install dependencies
 docker compose up -d     # shared dev infrastructure: Postgres + headed Chrome
-uv run funes migrate     # apply Pravda and Funes schemas, bootstrap pages from CSVs
-uv run funes enqueue     # queue one job per persisted page
-uv run procrastinate -a funes.procrastinate.app worker process  # consume the process queue
-uv run procrastinate -a funes.procrastinate.app shell list_jobs  # inspect the queue
-uv run pytest            # run the test suite
+uv run --env-file .env funes migrate      # apply Pravda and Funes schemas, bootstrap pages from CSVs
+uv run --env-file .env funes enqueue      # queue one job per persisted page
+uv run --env-file .env procrastinate worker process     # consume the process queue
+uv run --env-file .env procrastinate shell list_jobs    # inspect the queue
+uv run --env-file .env pytest             # run the test suite
 ```
 
 - Dependencies are added with `uv add`. Don't edit `pyproject.toml` manually.
@@ -27,7 +27,7 @@ uv run pytest            # run the test suite
 
 ```
 funes/
-  procrastinate.py  # module-level Procrastinate app; the CLI's -a target; worker config
+  procrastinate.py  # module-level Procrastinate app (the PROCRASTINATE_APP target); worker config
   cli.py        # migrate, enqueue commands
   tasks.py      # Procrastinate tasks: process_page pipeline; dormant review queue
   capture.py    # Pravda client and fsspec artifact helpers
@@ -41,7 +41,7 @@ funes/
 tests/          # pytest suite
 ```
 
-All env vars are read through `config.py`'s `load_config()`, never with ad-hoc `os.environ` reads. One-shot commands call it per process; the long-lived worker shares the `config` loaded once at import in `funes/procrastinate.py`.
+Every command runs as `uv run --env-file .env …`, so the environment comes from `.env` via uv; there is no dotenv dependency. Env vars are read through `config.py`'s `load_config()`, never with ad-hoc `os.environ` reads. One-shot commands call it per process; the long-lived worker shares the `config` loaded once at import in `funes/procrastinate.py`.
 
 ## Conventions
 

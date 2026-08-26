@@ -3,8 +3,6 @@
 import os
 from dataclasses import dataclass
 
-from dotenv import load_dotenv
-
 
 @dataclass(frozen=True)
 class PravdaSettings:
@@ -39,8 +37,7 @@ class Config:
 
 
 def load_config() -> Config:
-    """Load and validate all settings from the environment (and ``.env``)."""
-    load_dotenv()
+    """Load and validate all settings from the environment."""
     return Config(
         pravda=PravdaSettings(
             database_url=os.environ["PRAVDA_DATABASE_URL"],

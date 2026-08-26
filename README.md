@@ -26,12 +26,12 @@ uv sync
 
 ## Usage
 
-One-shot commands run through the `funes` console script; the worker is Procrastinate's own CLI, pointed at the module-level app in `funes/procrastinate.py`:
+One-shot commands run through the `funes` console script; the worker is Procrastinate's own CLI. All commands run as `uv run --env-file .env …`, which injects `.env` into the process environment, and `PROCRASTINATE_APP` in `.env` points Procrastinate's CLI at the module-level app in `funes/procrastinate.py`:
 
 ```bash
-uv run funes migrate  # apply schemas and import missing pages
-uv run funes enqueue  # queue one job per persisted page
-uv run procrastinate -a funes.procrastinate.app worker process  # consume the process queue (-c/--concurrency N)
+uv run --env-file .env funes migrate  # apply schemas and import missing pages
+uv run --env-file .env funes enqueue  # queue one job per persisted page
+uv run --env-file .env procrastinate worker process  # consume the process queue (-c/--concurrency N)
 ```
 
 The worker listens only on the `process` queue; the `review` queue is dormant by design, so running the worker without queue arguments would also pick up review jobs.
@@ -39,9 +39,9 @@ The worker listens only on the `process` queue; the `review` queue is dormant by
 Queued, running, and failed jobs live in the same Postgres database and are inspected with Procrastinate's own tooling:
 
 ```bash
-uv run procrastinate -a funes.procrastinate.app shell            # interactive: list_jobs, list_queues, cancel, retry
-uv run procrastinate -a funes.procrastinate.app shell list_jobs  # one-shot
-uv run procrastinate -a funes.procrastinate.app healthchecks     # configuration and DB sanity check
+uv run --env-file .env procrastinate shell            # interactive: list_jobs, list_queues, cancel, retry
+uv run --env-file .env procrastinate shell list_jobs  # one-shot
+uv run --env-file .env procrastinate healthchecks     # configuration and DB sanity check
 ```
 
 `migrate` is a release step, not an app-startup step: run it once per deploy, before starting `enqueue` or `worker`. It applies two Alembic ledgers to the shared Postgres database — Pravda's, shipped with the `opensanctions-pravda` package, and Funes's (`funes/migrations/`), which tracks Funes's tables plus the Procrastinate job-queue schema vendored at the pinned Procrastinate version. Bumping Procrastinate means vendoring its upgrade SQL in a new Funes revision. It then bootstraps the page catalogue from the CSVs under `INPUT_BASE_PATH` (columns `organization,url`); the import is append-only and never updates or deletes existing records.
@@ -51,5 +51,5 @@ uv run procrastinate -a funes.procrastinate.app healthchecks     # configuration
 ## Tests
 
 ```bash
-uv run pytest
+uv run --env-file .env pytest
 ```

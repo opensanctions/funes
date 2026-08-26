@@ -1,8 +1,9 @@
 """The module-level Procrastinate app, importable at a stable dotted path.
 
 Procrastinate's own CLI (worker, defer, shell, healthchecks) addresses the
-app through this module — ``procrastinate -a funes.procrastinate.app …`` —
-so the app and the worker's configuration are loaded once at import time
+app through this module — via ``PROCRASTINATE_APP=funes.procrastinate.app``
+in ``.env``, injected by ``uv run --env-file .env`` — so the app and the
+worker's configuration are loaded once at import time
 rather than built by a factory. Tasks register themselves in
 :mod:`funes.tasks`, which this app imports through ``import_paths``.
 """

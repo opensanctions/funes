@@ -35,11 +35,14 @@ USER app
 
 # INPUT_BASE_PATH points at the CSVs baked into the image; the PRAVDA_*
 # variables must be supplied at runtime (e.g. by the k8s CronJob spec).
-ENV INPUT_BASE_PATH=/app/datasets
+# PROCRASTINATE_APP points the Procrastinate CLI at the module-level app,
+# so the entrypoint needs no -a flag.
+ENV INPUT_BASE_PATH=/app/datasets \
+    PROCRASTINATE_APP=funes.procrastinate.app
 
 # The image's long-running process is the Procrastinate worker on the
 # process queue (the review queue stays dormant until review exists).
 # One-shot funes commands override the entrypoint, e.g.
 #   podman run --entrypoint funes funes migrate
-ENTRYPOINT ["procrastinate", "-a", "funes.procrastinate.app"]
+ENTRYPOINT ["procrastinate"]
 CMD ["worker", "process"]
