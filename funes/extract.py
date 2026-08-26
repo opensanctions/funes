@@ -1,6 +1,7 @@
 """LLM extraction schema, prompts, and Pydantic AI agent construction."""
 
 import logging
+from typing import Literal
 
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
@@ -116,6 +117,26 @@ Expected position: Honorary Life Member. Expected position description: null;
 the reason for an honour is not a responsibility of its holder.
 </example>
 
+# Broken pages
+
+If the page is unusable as a source, do not extract. Instead mark the page
+broken with kind="broken" and a short reason. Mark a page broken only for:
+
+- Cloudflare or other bot-detection challenges ("Checking your browser",
+  "Verify you are human", similar interstitials).
+- HTTP or server errors (5xx, gateway timeouts) and 404 or otherwise
+  missing pages, including parked domains.
+- Login walls, paywalls, or cookie-consent gates with no usable public
+  content behind them.
+- Blank shells: pages with no meaningful text or metadata.
+- Pages whose final content is unrelated to the requested URL because of
+  an unexpected redirect.
+
+A usable page that simply lists no position holders is NOT broken: return
+kind="extraction" with an empty persons list. The requested URL, final URL,
+HTTP status, and capture error are context only: use them to interpret the
+page, but the page text and metadata decide whether it is broken.
+
 # Final check
 
 Before returning, verify that every person is named, every position is
@@ -127,7 +148,10 @@ terms remain separate, and repeated mentions have not created duplicates.
 class PageMetadata(BaseModel):
     """Small, explicit slice of page metadata supplied to the model."""
 
-    url: str
+    requested_url: str
+    final_url: str
+    http_status: int | None = None
+    capture_error: str | None = None
     title: str | None
     description: str | None
 
@@ -197,13 +221,24 @@ class Person(BaseModel):
 
 
 class Extraction(BaseModel):
+    kind: Literal["extraction"] = "extraction"
     persons: list[Person] = Field(
         default_factory=list,
         description="Position holders stated on the page. Empty list if none.",
     )
 
 
-def build_extraction_agent(model_name: str) -> Agent[None, Extraction]:
+class BrokenPage(BaseModel):
+    """Result for a page that cannot be used as an extraction source."""
+
+    kind: Literal["broken"] = "broken"
+    reason: str = Field(min_length=1, description="Why the page is unusable.")
+
+
+PageResult = Extraction | BrokenPage
+
+
+def build_extraction_agent(model_name: str) -> Agent[None, PageResult]:
     """Build the reusable extraction agent for *model_name*.
 
     Tool-based structured output into ``Extraction``; the agent has no tools
@@ -212,7 +247,7 @@ def build_extraction_agent(model_name: str) -> Agent[None, Extraction]:
     return Agent(
         f"openai:{model_name}",
         name=AGENT_NAME,
-        output_type=Extraction,
+        output_type=PageResult,
         instructions=_INSTRUCTIONS_HEAD,
         model_settings={"thinking": THINKING},
     )
@@ -224,24 +259,39 @@ def prompt_content(metadata: PageMetadata, text: str) -> str:
     Returns the ``<page_metadata>`` / ``<page_text>`` source block that
     carries the page metadata slice and the plaintext.
     """
+    status = "[not provided]"
+    if metadata.http_status is not None:
+        status = str(metadata.http_status)
+    lines = [
+        "Requested URL (context only): " + metadata.requested_url,
+        "Final URL (context only): " + metadata.final_url,
+        f"HTTP status (context only): {status}",
+    ]
+    if metadata.capture_error is not None:
+        lines.append(f"Capture error (context only): {metadata.capture_error}")
+    lines.append(f"Document title: {metadata.title or '[not provided]'}")
+    lines.append(f"Meta description: {metadata.description or '[not provided]'}")
     return (
-        "<page_metadata>\n"
-        f"URL (context only): {metadata.url}\n"
-        f"Document title: {metadata.title or '[not provided]'}\n"
-        f"Meta description: {metadata.description or '[not provided]'}\n"
-        "</page_metadata>\n\n"
+        "<page_metadata>\n" + "\n".join(lines) + "\n</page_metadata>\n\n"
         "<page_text>\n"
         f"{text}\n"
         "</page_text>"
     )
 
 
-def metadata_from_html(url: str, html: str) -> PageMetadata:
+def metadata_from_html(
+    requested_url: str,
+    html: str,
+    final_url: str | None = None,
+    http_status: int | None = None,
+    capture_error: str | None = None,
+) -> PageMetadata:
     """Extract the small metadata slice used as model context.
 
     Open Graph values are fallbacks only: the document title and standard meta
-    description win when both forms are present. The URL is included as context
-    but the model is explicitly forbidden from treating it as evidence.
+    description win when both forms are present. The URLs, HTTP status, and
+    capture error are included as context but the model is explicitly forbidden
+    from treating them as evidence.
     """
     soup = BeautifulSoup(html, "html.parser")
     title = soup.title.get_text(" ", strip=True) if soup.title is not None else None
@@ -260,7 +310,10 @@ def metadata_from_html(url: str, html: str) -> PageMetadata:
         title = str(title_tag.get("content", "")).strip() if title_tag else None
 
     return PageMetadata(
-        url=url,
+        requested_url=requested_url,
+        final_url=final_url or requested_url,
+        http_status=http_status,
+        capture_error=capture_error,
         title=title or None,
         description=description or None,
     )
