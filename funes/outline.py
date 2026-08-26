@@ -1,0 +1,197 @@
+"""On-demand DOM outline for model consumption.
+
+``build_outline`` derives a compact, YAML-ish outline of a Pravda snapshot's
+rendered HTML, in the spirit of Playwright's AI aria snapshot but built on the
+rendered DOM itself: nodes carry their element names, so every resource stays
+at its actual DOM position and in document order.
+
+Line grammar (two-space indent, one line per node)::
+
+    - tag "leading text" [attr=value] [attr=value]:
+      - text: "text interleaved with child elements"
+      - child ...
+
+- The quoted name is the element's own contiguous leading text. Text runs
+  interleaved with child elements stay in place as ``- text:`` lines, so
+  document order is preserved exactly.
+- Singular wrappers collapse: an element whose retained content is exactly
+  one child and that contributes no text or attributes of its own is
+  replaced by that child (bottom-up), so chains of single-purpose containers
+  (``div > div > div``) leave no trace. Elements that carry a link, an image,
+  or text never collapse.
+- Every ``<img>`` is retained — linked or unlinked, with or without alt text,
+  empty alt included (``[alt=]``). Nothing is treated as invisible:
+  ``hidden`` and ``aria-hidden`` subtrees stay in the outline. ``src``/``href``
+  values are resolved against the page URL with exact ``urljoin`` semantics;
+  nothing is guessed.
+- An image whose resolved URL exactly matches a HAR entry with a stored body
+  is annotated ``[body=<path>]`` with the ``content._file`` value from the
+  snapshot's resolved HTTP archive (Pravda rewrites it to a full storage
+  path over the shared artifact store).
+
+Deliberately unsupported: ARIA roles and computed names (element names only),
+``srcset``/``<picture>``/``<source>`` resolution (``src`` only, so a responsive
+image shows its fallback URL and may miss the ``body`` of the variant the
+browser actually loaded), and any HAR matching beyond exact request-URL
+equality. The outline is derived on demand from artifacts the caller already
+holds; nothing is persisted.
+"""
+
+import json
+from dataclasses import dataclass, field
+from urllib.parse import urljoin
+
+from bs4 import BeautifulSoup, NavigableString, Tag
+
+# Elements whose content never reaches the rendered page.
+SKIP_TAGS = frozenset({"head", "script", "style", "noscript", "template"})
+
+
+def build_outline(url: str, html: str, http_archive: dict | None = None) -> str:
+    """Render *html*, captured from *url*, as a compact model-facing outline.
+
+    *url* is the page's final URL: the base for resolving ``src``/``href``
+    and the exact key matched against HAR request URLs. *http_archive* is the
+    snapshot's resolved HAR manifest, or ``None`` when the capture has none.
+    """
+    if not url.startswith(("http://", "https://")):
+        raise ValueError(f"outline base URL must be absolute http(s), got {url!r}")
+    soup = BeautifulSoup(html, "html.parser")
+    bodies = _har_bodies(http_archive)
+    root = _build(soup.body if soup.body is not None else soup, url, bodies)
+    lines: list[str] = []
+    if root is not None:
+        if root.text is not None:
+            lines.append(f"- text: {_quote(root.text)}")
+        for child in root.children:
+            if isinstance(child, str):
+                lines.append(f"- text: {_quote(child)}")
+            else:
+                lines.extend(_render(child, 0))
+    return "\n".join(lines)
+
+
+@dataclass
+class _Node:
+    """One rendered element: its tag, folded leading text, kept attributes."""
+
+    tag: str
+    text: str | None = None
+    attrs: list[tuple[str, str]] = field(default_factory=list)
+    children: list["_Node | str"] = field(default_factory=list)
+
+
+def _build(tag: Tag, url: str, bodies: dict[str, str]) -> _Node | None:
+    """Map one element to a node, or ``None`` when nothing of it is retained."""
+    if tag.name in SKIP_TAGS:
+        return None
+
+    children: list[_Node | str] = []
+    for child in tag.children:
+        if isinstance(child, Tag):
+            node = _build(child, url, bodies)
+            if node is not None:
+                children.append(node)
+        elif type(child) is NavigableString:
+            text = _normalize(str(child))
+            if text:
+                children.append(text)
+    children = _merge_adjacent_text(children)
+
+    node = _Node(tag=tag.name, attrs=_kept_attrs(tag, url, bodies), children=children)
+    # A single leading text run becomes the element's name; interleaved runs
+    # stay in place as children so document order is preserved.
+    if (
+        children
+        and isinstance(children[0], str)
+        and all(not isinstance(child, str) for child in children[1:])
+    ):
+        node.text = children[0]
+        node.children = children[1:]
+    # Every <img> is retained; anything else must carry some content.
+    if tag.name != "img" and node.text is None and not node.attrs and not node.children:
+        return None
+    # A wrapper adding nothing of its own folds into its single child, so
+    # container chains collapse bottom-up into the element that matters.
+    if node.text is None and not node.attrs and len(node.children) == 1:
+        child = node.children[0]
+        if not isinstance(child, str):
+            return child
+    return node
+
+
+def _kept_attrs(tag: Tag, url: str, bodies: dict[str, str]) -> list[tuple[str, str]]:
+    """The attributes worth showing: link targets and image sources."""
+    attrs: list[tuple[str, str]] = []
+    if tag.name == "a":
+        href = tag.get("href")
+        if isinstance(href, str):
+            attrs.append(("href", urljoin(url, href)))
+    elif tag.name == "img":
+        src = tag.get("src")
+        if isinstance(src, str):
+            resolved = urljoin(url, src)
+            attrs.append(("src", resolved))
+            if resolved in bodies:
+                attrs.append(("body", bodies[resolved]))
+        alt = tag.get("alt")
+        if isinstance(alt, str):
+            attrs.append(("alt", alt))
+    return attrs
+
+
+def _har_bodies(http_archive: dict | None) -> dict[str, str]:
+    """Map HAR request URLs to their stored body paths (``content._file``).
+
+    The latest entry with a stored body wins; bodyless entries never shadow
+    an earlier body for the same URL.
+    """
+    if http_archive is None:
+        return {}
+    bodies: dict[str, str] = {}
+    for entry in http_archive["log"]["entries"]:
+        file = entry["response"]["content"].get("_file")
+        if file:
+            bodies[entry["request"]["url"]] = file
+    return bodies
+
+
+def _render(node: _Node, depth: int) -> list[str]:
+    """Emit one element's line, then its children one level deeper."""
+    pad = "  " * depth
+    key = node.tag
+    if node.text is not None:
+        key += " " + _quote(node.text)
+    for name, value in node.attrs:
+        key += f" [{name}={value}]"
+    line = f"{pad}- {key}"
+    if not node.children:
+        return [line]
+    lines = [line + ":"]
+    for child in node.children:
+        if isinstance(child, str):
+            lines.append(f"{'  ' * (depth + 1)}- text: {_quote(child)}")
+        else:
+            lines.extend(_render(child, depth + 1))
+    return lines
+
+
+def _merge_adjacent_text(children: list["_Node | str"]) -> list["_Node | str"]:
+    """Join neighbouring text runs dropped-element gaps leave behind."""
+    merged: list[_Node | str] = []
+    for child in children:
+        if isinstance(child, str) and merged and isinstance(merged[-1], str):
+            merged[-1] = f"{merged[-1]} {child}"
+        else:
+            merged.append(child)
+    return merged
+
+
+def _normalize(text: str) -> str:
+    """Collapse all whitespace runs to single spaces and strip the ends."""
+    return " ".join(text.split())
+
+
+def _quote(text: str) -> str:
+    """Quote a text value as a JSON string, keeping non-ASCII readable."""
+    return json.dumps(text, ensure_ascii=False)
