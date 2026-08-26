@@ -46,5 +46,11 @@ cases:
       - name: Delegate
         organization: Lakes Basin Commission
         start_date: Jan, 2026
+- name: elections_no_holders
+  inputs:
+    fixture: elections_no_holders
+    url: https://www.aia.example.org/elecciones
+  expected_output:
+    kind: extraction
 evaluators:
 - ExtractionF1
