@@ -1,20 +1,15 @@
-"""Pravda integration and screenshot artifacts.
+"""Pravda integration and artifact reading.
 
 - ``read_artifact`` reads a snapshot artifact blob from the shared fsspec
   storage backend Funes and Pravda both use.
-- ``is_blank`` / ``split_image`` are image primitives over a screenshot blob
-  (shared by capture and the extraction tiling path).
 
 Pravda is an in-process async library. Funes constructs a ``Pravda``
 instance from its environment-backed settings for each capture; it never
 speaks HTTP to Pravda.
 """
 
-import io
-
 import fsspec
 from fsspec.implementations.asyn_wrapper import AsyncFileSystemWrapper
-from PIL import Image
 from pravda import Pravda, PravdaConfig
 
 from funes.config import PravdaSettings
@@ -69,52 +64,3 @@ async def read_artifact(fs, path: str) -> bytes:
     ``storage_filesystem`` for why the sync ``fs.open`` path is avoided.
     """
     return await fs._cat_file(path)
-
-
-def is_blank(blob: bytes) -> bool:
-    """True if the image is a single solid colour (a blank or failed render).
-
-    ``getcolors(1)`` returns a list iff the image has at most one distinct
-    colour, else None — so a blank white/black/any-colour page reads as blank.
-    """
-    image = Image.open(io.BytesIO(blob))
-    return image.getcolors(1) is not None
-
-
-def split_image(blob: bytes, tile: int, overlap: float) -> list[bytes]:
-    """Slice an image into *overlap*-fraction overlapping *tile*-px tall strips.
-
-    Screenshots are hardclipped for width, so only the height axis ever needs
-    slicing: each strip keeps the full width. Strips are laid out on a stride
-    of ``tile * (1 - overlap)``, with a shorter remainder strip at the end if
-    needed. Images no taller than *tile* come back as a single strip.
-
-    Solid-colour strips (remainder offcuts, background bands) carry no
-    content and are dropped via the same ``getcolors(1)`` check as
-    ``is_blank``, so they never reach the model.
-    """
-    image = Image.open(io.BytesIO(blob))
-    width, height = image.size
-
-    def spans(size: int) -> list[tuple[int, int]]:
-        if size <= tile:
-            return [(0, size)]
-        stride = round(tile * (1 - overlap))
-        result: list[tuple[int, int]] = []
-        start = 0
-        while start + tile <= size:
-            result.append((start, start + tile))
-            start += stride
-        if start < size:
-            result.append((start, size))
-        return result
-
-    tiles: list[bytes] = []
-    for top, bottom in spans(height):
-        crop = image.crop((0, top, width, bottom))
-        if crop.getcolors(1) is not None:
-            continue
-        buf = io.BytesIO()
-        crop.save(buf, format="PNG")
-        tiles.append(buf.getvalue())
-    return tiles

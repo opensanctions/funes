@@ -10,7 +10,6 @@ dependencies = [
     "click>=8.4.1",
     "fsspec[gcs]>=2026.6.0",
     "opensanctions-pravda>=0.1.6",
-    "pillow>=12.2.0",
     "procrastinate==3.9.0",
     "psycopg[binary]>=3.3.4",
     "pydantic-ai-slim[openai]>=2.33,<3",
