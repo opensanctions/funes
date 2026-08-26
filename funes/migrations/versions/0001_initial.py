@@ -35,27 +35,32 @@ def upgrade() -> None:
         sa.UniqueConstraint("page_id", "organization"),
     )
     op.create_table(
-        "extraction",
+        "inspection",
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("page_id", sa.Uuid(), nullable=False),
-        sa.Column("model", sa.Text(), nullable=False),
         sa.Column("snapshot_id", sa.Uuid(), nullable=False),
+        sa.Column("outcome", sa.Text(), nullable=False),
+        sa.Column("reason", sa.Text(), nullable=True),
+        sa.Column("model", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("captured_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("extracted_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("extracted_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["page_id"], ["page.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_inspection_page_created", "inspection", ["page_id", "created_at"]
     )
     op.create_table(
         "person",
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("extraction_id", sa.Uuid(), nullable=False),
+        sa.Column("inspection_id", sa.Uuid(), nullable=False),
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("dob", sa.Text(), nullable=True),
         sa.Column("bio", sa.Text(), nullable=True),
         sa.Column("countries", sa.JSON(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["extraction_id"], ["extraction.id"], ondelete="CASCADE"
+            ["inspection_id"], ["inspection.id"], ondelete="CASCADE"
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -77,6 +82,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("position")
     op.drop_table("person")
-    op.drop_table("extraction")
+    op.drop_index("ix_inspection_page_created", table_name="inspection")
+    op.drop_table("inspection")
     op.drop_table("page_organization")
     op.drop_table("page")

@@ -18,6 +18,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "aiosqlite>=0.22.1",
     "pre-commit>=4.6.0",
     "pydantic-evals>=2.34.0",
     "pytest>=9.1.1",
