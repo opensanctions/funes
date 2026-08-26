@@ -1,75 +1,81 @@
-"""Unit tests for extraction outcome state-transition helpers."""
+"""Unit tests for completed-extraction persistence."""
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
 
-from funes.db import Extraction, Person, extraction_broken, extraction_succeeded
+from funes.db import Extraction, Person, Position, store_extraction
 from funes.extract import Extraction as ExtractionResult
 from funes.extract import Person as PersonResult
 from funes.extract import Position as PositionResult
 
 
 class FakeSession:
-    """Collects add_all calls so persisted graphs can be inspected."""
+    """Collects add calls so persisted graphs can be inspected."""
 
     def __init__(self) -> None:
         self.added: list[object] = []
 
-    def add_all(self, objects) -> None:
-        self.added.extend(objects)
+    def add(self, obj) -> None:
+        self.added.append(obj)
 
 
 def make_snapshot() -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), captured_at=datetime.now(UTC))
 
 
-def test_extraction_succeeded_sets_outcome_and_persons():
-    extraction = Extraction(url="https://example.org", model="test-model")
-    snapshot = make_snapshot()
+def test_store_extraction_persists_completed_graph():
     session = FakeSession()
+    extraction_id = uuid4()
+    page_id = uuid4()
+    snapshot = make_snapshot()
     result = ExtractionResult(
         persons=[
             PersonResult(
                 name="Jane Doe",
                 countries=["Utopia"],
-                positions=[PositionResult(name="Chair")],
+                positions=[PositionResult(name="Chair", organization="Board")],
             )
         ]
     )
 
-    extraction_succeeded(session, extraction, snapshot, result)
+    extraction = store_extraction(
+        session,
+        extraction_id=extraction_id,
+        page_id=page_id,
+        model="test-model",
+        snapshot=snapshot,
+        result=result,
+    )
 
+    assert isinstance(extraction, Extraction)
+    assert extraction.id == extraction_id
+    assert extraction.page_id == page_id
+    assert extraction.model == "test-model"
     assert extraction.snapshot_id == snapshot.id
     assert extraction.captured_at == snapshot.captured_at
-    assert extraction.outcome == "extracted"
-    assert extraction.processed_at is not None
-    assert extraction.broken_reason is None
+    assert extraction.extracted_at is not None
+    assert session.added == [extraction]
 
-    persons = [obj for obj in session.added if isinstance(obj, Person)]
+    persons = extraction.persons
     assert [p.name for p in persons] == ["Jane Doe"]
-    assert [pos.name for pos in persons[0].positions] == ["Chair"]
+    assert [p.extraction_id for p in persons] == [extraction_id]
+    positions: list[Position] = persons[0].positions
+    assert [pos.name for pos in positions] == ["Chair"]
+    assert positions[0].organization == "Board"
 
 
-def test_extraction_broken_sets_reason_without_persons():
-    extraction = Extraction(url="https://example.org", model="test-model")
-    snapshot = make_snapshot()
+def test_store_extraction_without_persons():
     session = FakeSession()
 
-    extraction_broken(session, extraction, snapshot, "capture timed out")
+    extraction = store_extraction(
+        session,
+        extraction_id=uuid4(),
+        page_id=uuid4(),
+        model="test-model",
+        snapshot=make_snapshot(),
+        result=ExtractionResult(persons=[]),
+    )
 
-    assert extraction.snapshot_id == snapshot.id
-    assert extraction.captured_at == snapshot.captured_at
-    assert extraction.outcome == "broken"
-    assert extraction.processed_at is not None
-    assert extraction.broken_reason == "capture timed out"
-    assert session.added == []
-
-
-def test_new_extraction_is_pending():
-    extraction = Extraction(url="https://example.org", model="test-model")
-    assert extraction.snapshot_id is None
-    assert extraction.captured_at is None
-    assert extraction.outcome is None
-    assert extraction.processed_at is None
-    assert extraction.broken_reason is None
+    assert extraction.persons == []
+    assert all(not isinstance(obj, Person) for obj in session.added)
