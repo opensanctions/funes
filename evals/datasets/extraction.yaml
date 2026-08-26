@@ -59,5 +59,39 @@ cases:
     url: https://www.aia.example.org/elecciones
   expected_output:
     kind: extraction
-evaluators:
+- name: board_member_cards
+  inputs:
+    fixture: board_member_cards
+    url: https://www.meridian.example.org/board
+  expected_output:
+    kind: extraction
+    persons:
+    - name: Dr. Ibembe Orlu
+      positions:
+      - name: Board member
+        organization: Meridian Accord
+      - name: Chair of the Board
+        organization: Meridian Accord
+    - name: Tomas Ferreira Lopes
+      positions:
+      - name: Board member
+        organization: Meridian Accord
+      - name: National Coordinator, Zarvia Multi-Stakeholder Group
+        organization: Zarvia Multi-Stakeholder Group
+    - name: Nadia Solheim
+      positions:
+      - name: Board member alternate
+        organization: Meridian Accord
+      - name: Deputy Minister of Environment, Republic of Halvard
+        jurisdiction: Republic of Halvard
+    - name: Peter Anand Mukherjee
+      positions:
+      - name: Board member
+        organization: Meridian Accord
+      - name: Head of Extractives Practice, Corvin Policy Institute
+        organization: Corvin Policy Institute
+    - name: Ingrid Dahl
+      positions:
+      - name: Board member
+        organization: Meridian Accordevaluators:
 - ExtractionF1
