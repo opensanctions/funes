@@ -11,6 +11,16 @@ from funes.config import PravdaSettings
 REQUIRED_ARTIFACTS = ("plaintext", "rendered_html")
 
 
+def first_error_line(error: str | None) -> str | None:
+    """Return the first non-empty line of a capture error, or None."""
+    if error is None:
+        return None
+    return next(
+        (line.strip() for line in error.splitlines() if line.strip()),
+        None,
+    )
+
+
 def inspectability_issue(snapshot: Snapshot) -> str | None:
     """Return None if the snapshot is inspectable, else a concise reason.
 
@@ -36,10 +46,7 @@ def inspectability_issue(snapshot: Snapshot) -> str | None:
         return None
     if snapshot.error:
         # Playwright errors are multiline logs; keep only the first line.
-        diagnostics = next(
-            (line.strip() for line in snapshot.error.splitlines() if line.strip()),
-            None,
-        )
+        diagnostics = first_error_line(snapshot.error)
     elif snapshot.http_status is not None and snapshot.http_status >= 400:
         diagnostics = f"http status {snapshot.http_status}"
     else:
