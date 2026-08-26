@@ -93,5 +93,6 @@ cases:
     - name: Ingrid Dahl
       positions:
       - name: Board member
-        organization: Meridian Accordevaluators:
+        organization: Meridian Accord
+evaluators:
 - ExtractionF1
