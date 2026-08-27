@@ -1,19 +1,25 @@
 # Funes
 
-Funes turns the internet into lists of politicians. It orchestrates web capture (via the in-process [Pravda](https://github.com/opensanctions/pravda) library), LLM extraction, and structured storage to pull political position holders out of web pages.
+Funes turns web pages into objective-scoped people/position facts. It orchestrates web capture (via the in-process [Pravda](https://github.com/opensanctions/pravda) library), LLM extraction against natural-language objectives, and structured storage.
 
 ## Status
 
 Early R&D. Currently exploring what a viable automated extraction pipeline looks like.
 
-## What it does
+## Model
 
-1. Captures snapshots (plaintext, rendered HTML, HAR, screenshot) via Pravda, against a remote browser, Postgres, and an artifact store that Funes owns and runs
-2. Builds a compact outline of the rendered HTML and feeds it, with page metadata, to an LLM that extracts structured person/position pairs; the model can fetch page resources such as images through a tool
-3. Persists each completed extraction with nested extraction-scoped persons and positions, linked to Pravda snapshot identifiers
-4. Writes each agent run's message history as one JSON transcript under `SESSIONS_BASE_PATH`
+Inputs are CSV files with columns `objective,url`. Each file's stem names a **Dataset**. An **Objective** is natural language describing what to learn — e.g. `Heads of the Global Environment Facility` — and a **URL** is a global identity, deduplicated across objectives. A **Candidate** links one objective to one URL and is the pipeline's unit of work.
 
-Pages whose snapshot is non-inspectable, or whose model output is a `BrokenPage`, get no extraction; the job defers to a separate `review` queue that the normal worker does not consume, so those jobs sit pending until review is implemented.
+A worker run on a candidate captures an immutable Pravda **Snapshot** (plaintext, rendered HTML, HAR, screenshot) against a remote browser, Postgres, and an artifact store that Funes owns and runs. The run becomes an **Attempt** linking the candidate to the snapshot. Infra failures (exceptions) write no attempt; retrying them is Procrastinate's business, not a domain fact.
+
+Each completed attempt records one of two terminal judgements:
+
+- A **SnapshotAssessment** judges the snapshot itself: `usable` or `broken`. Broken is snapshot-level and explicit — the same snapshot may look fine for other purposes — and broken snapshots are routed to a dormant repair queue the normal worker does not consume. Brokenness is never attached to a URL, and it produces no inspection.
+- A **usable** snapshot additionally gets an objective-relative **Inspection**: `hit` (the objective is satisfied; extracted persons and their positions are attached) or `miss` (nothing on the page satisfies the objective, with a reason). Hits are revisited after an interval; misses are not normally retried.
+
+Extraction feeds a compact outline of the rendered HTML plus page metadata to an LLM, which can fetch page resources such as images through a tool. Each agent run's message history is written as one JSON transcript under `SESSIONS_BASE_PATH`.
+
+A natural next direction is discovering new URLs worth adding as candidates; that is not implemented today.
 
 ## Setup
 
@@ -29,8 +35,8 @@ uv sync
 One-shot commands run through the `funes` console script; the worker is Procrastinate's own CLI. All commands run as `uv run --env-file .env …`, which injects `.env` into the process environment, and `PROCRASTINATE_APP` in `.env` points Procrastinate's CLI at the module-level app in `funes/procrastinate.py`:
 
 ```bash
-uv run --env-file .env funes migrate  # apply schemas and import missing pages
-uv run --env-file .env funes enqueue  # queue one job per due page (revisit interval, deduped)
+uv run --env-file .env funes migrate  # apply schemas and import missing candidates
+uv run --env-file .env funes enqueue  # queue one job per due candidate (revisit interval, deduped)
 uv run --env-file .env procrastinate worker  # consume the process queue (-c/--concurrency N)
 ```
 
@@ -42,9 +48,9 @@ uv run --env-file .env procrastinate shell list_jobs  # one-shot
 uv run --env-file .env procrastinate healthchecks     # configuration and DB sanity check
 ```
 
-`migrate` applies two Alembic ledgers to the shared Postgres database — Pravda's, shipped with the `opensanctions-pravda` package, and Funes's (`funes/migrations/`), which tracks Funes's tables plus the Procrastinate job-queue schema vendored at the pinned Procrastinate version. Bumping Procrastinate means vendoring its upgrade SQL in a new Funes revision. It then bootstraps the page catalogue from the CSVs under `INPUT_BASE_PATH` (columns `organization,url`): each file becomes a `dataset` row named after its filename stem, and its pages are linked to it as dataset memberships. The import is append-only and never updates or deletes existing records.
+`migrate` applies two Alembic ledgers to the shared Postgres database — Pravda's, shipped with the `opensanctions-pravda` package, and Funes's (`funes/migrations/`), which tracks Funes's tables plus the Procrastinate job-queue schema vendored at the pinned Procrastinate version. Bumping Procrastinate means vendoring its upgrade SQL in a new Funes revision. It then bootstraps the catalogue from the CSVs under `INPUT_BASE_PATH` (columns `objective,url`): each file becomes a `dataset` row named after its filename stem, with objectives and global URLs linked through candidates. The import is append-only and never updates or deletes existing records.
 
-`enqueue` queues one `page_id` job per due page: pages never inspected, plus pages whose latest inspection was productive and older than `REVISIT_INTERVAL_DAYS`; empty and broken pages are not re-enqueued. Each job is deferred with a per-page queueing lock, so a page that already has a pending job is skipped rather than double-queued. The worker resolves the page, captures a snapshot, runs extraction with the model from its own configuration, and records every terminal run — productive, empty, or broken — as an inspection row; the extraction graph is committed only on productive runs.
+`enqueue` queues one `inspect_candidate` job per due candidate: candidates never attempted, plus candidates whose latest attempt was a hit inspection older than `REVISIT_INTERVAL_DAYS`. A latest miss inspection or broken assessment blocks re-enqueueing; broken snapshots belong to the (unimplemented) repair path, not the normal queue. Each job is deferred with a per-candidate queueing lock, so a candidate that already has a pending job is skipped rather than double-queued.
 
 ## Tests
 

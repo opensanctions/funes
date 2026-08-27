@@ -1,6 +1,6 @@
 # Funes
 
-Funes turns raw web pages into structured data about political position holders. It embeds [Pravda](https://github.com/opensanctions/pravda) (PyPI: `opensanctions-pravda`) as an in-process async library for page capture and storage, and queues page-processing jobs through Procrastinate. Funes owns the infrastructure Pravda connects to: a headed Chrome browser, an async Postgres database, and an fsspec artifact store (see `.env.example`).
+Funes turns web pages into objective-scoped people/position facts. It embeds [Pravda](https://github.com/opensanctions/pravda) (PyPI: `opensanctions-pravda`) as an in-process async library for page capture and storage, and queues candidate-inspection jobs through Procrastinate. Funes owns the infrastructure Pravda connects to: a headed Chrome browser, an async Postgres database, and an fsspec artifact store (see `.env.example`).
 
 ## Project philosophy
 
@@ -13,8 +13,8 @@ Funes turns raw web pages into structured data about political position holders.
 ```bash
 uv sync                  # install dependencies
 docker compose up -d     # shared dev infrastructure: Postgres + headed Chrome
-uv run --env-file .env funes migrate      # apply Pravda and Funes schemas, bootstrap pages from CSVs
-uv run --env-file .env funes enqueue      # queue one job per persisted page
+uv run --env-file .env funes migrate      # apply Pravda and Funes schemas, bootstrap candidates from CSVs
+uv run --env-file .env funes enqueue      # queue one job per due candidate
 uv run --env-file .env procrastinate worker  # consume the process queue
 uv run --env-file .env procrastinate shell list_jobs    # inspect the queue
 uv run --env-file .env pytest             # run the test suite
@@ -29,13 +29,13 @@ uv run --env-file .env pytest             # run the test suite
 funes/
   procrastinate.py  # module-level Procrastinate app (the PROCRASTINATE_APP target); worker config
   cli.py        # migrate, enqueue commands
-  tasks.py      # Procrastinate tasks: process_page pipeline; dormant review queue
+  tasks.py      # Procrastinate tasks: inspect_candidate pipeline; dormant repair_snapshot
   capture.py    # Pravda client and fsspec artifact helpers
-  extract.py    # pydantic-ai extraction agent, output schema, prompt
+  extract.py    # pydantic-ai extraction agent, Hit/Miss output schema, prompt
   outline.py    # compact model-facing outline from rendered HTML + HAR
-  db.py         # SQLAlchemy models and persistence
+  db.py         # SQLAlchemy models: Objective/URL/Candidate/Attempt persistence
   migrate.py    # Alembic runner; migrations/ holds Funes's ledger
-  sources.py    # bootstrap CSV loading
+  sources.py    # bootstrap CSV loading (objective,url rows)
   config.py     # typed configuration
   sessions.py   # agent session transcripts
 tests/          # pytest suite
