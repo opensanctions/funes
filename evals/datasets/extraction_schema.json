@@ -3,16 +3,16 @@
     "BrokenSnapshot": {
       "description": "Result for a Pravda snapshot that cannot be used as a source.",
       "properties": {
-        "reason": {
-          "description": "Why the snapshot is unusable.",
-          "minLength": 1,
-          "title": "Reason",
-          "type": "string"
-        },
         "kind": {
           "const": "broken",
           "default": "broken",
           "title": "Kind",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Why the snapshot is unusable.",
+          "minLength": 1,
+          "title": "Reason",
           "type": "string"
         }
       },
@@ -177,8 +177,6 @@
           "type": "string"
         },
         "objective": {
-          "description": "What the requester wants to learn from the page.",
-          "minLength": 1,
           "title": "Objective",
           "type": "string"
         }
@@ -901,16 +899,16 @@
     "Miss": {
       "description": "Usable snapshot that contains nothing satisfying the objective.",
       "properties": {
-        "reason": {
-          "description": "What the page does contain and why it falls short of the objective.",
-          "minLength": 1,
-          "title": "Reason",
-          "type": "string"
-        },
         "kind": {
           "const": "miss",
           "default": "miss",
           "title": "Kind",
+          "type": "string"
+        },
+        "reason": {
+          "description": "What the page does contain and why it falls short of the objective.",
+          "minLength": 1,
+          "title": "Reason",
           "type": "string"
         }
       },

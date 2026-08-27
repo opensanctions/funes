@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+from pydantic_ai.models import Model
+
 from evals.models import FixtureInput
 from funes.extract import (
     ExtractionDependencies,
@@ -16,7 +18,7 @@ from funes.outline import build_outline, har_resource_media_types
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-async def extract(inputs: FixtureInput, model: str) -> PageResult:
+async def extract(inputs: FixtureInput, model: Model | str) -> PageResult:
     """Run metadata/outline/prompt construction and the extraction agent."""
     html = (FIXTURES / f"{inputs.fixture}.html").read_text(encoding="utf-8")
     har_path = FIXTURES / f"{inputs.fixture}.har.json"
