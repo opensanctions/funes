@@ -35,6 +35,24 @@ def upgrade() -> None:
         sa.UniqueConstraint("page_id", "organization"),
     )
     op.create_table(
+        "dataset",
+        sa.Column("id", sa.Uuid(), nullable=False),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("name"),
+    )
+    op.create_table(
+        "page_dataset",
+        sa.Column("id", sa.Uuid(), nullable=False),
+        sa.Column("page_id", sa.Uuid(), nullable=False),
+        sa.Column("dataset_id", sa.Uuid(), nullable=False),
+        sa.ForeignKeyConstraint(["page_id"], ["page.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["dataset_id"], ["dataset.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("page_id", "dataset_id"),
+    )
+    op.create_table(
         "inspection",
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("page_id", sa.Uuid(), nullable=False),
@@ -84,5 +102,7 @@ def downgrade() -> None:
     op.drop_table("person")
     op.drop_index("ix_inspection_page_created", table_name="inspection")
     op.drop_table("inspection")
+    op.drop_table("page_dataset")
+    op.drop_table("dataset")
     op.drop_table("page_organization")
     op.drop_table("page")

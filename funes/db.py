@@ -16,7 +16,8 @@ from sqlalchemy import (
     or_,
     select,
 )
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import insert as postgres_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -52,7 +53,7 @@ class Base(DeclarativeBase):
 
 
 class Page(Base):
-    """One durable web page, identified by URL, with its organizations."""
+    """One durable web page, identified by URL, with its datasets and organizations."""
 
     __tablename__ = "page"
 
@@ -65,9 +66,46 @@ class Page(Base):
     organizations: Mapped[list["PageOrganization"]] = relationship(
         back_populates="page", cascade="all, delete-orphan"
     )
+    datasets: Mapped[list["PageDataset"]] = relationship(
+        back_populates="page", cascade="all, delete-orphan"
+    )
     inspections: Mapped[list["Inspection"]] = relationship(
         back_populates="page", cascade="all, delete-orphan"
     )
+
+
+class Dataset(Base):
+    """One input dataset, named after its source CSV filename stem."""
+
+    __tablename__ = "dataset"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+    pages: Mapped[list["PageDataset"]] = relationship(
+        back_populates="dataset", cascade="all, delete-orphan"
+    )
+
+
+class PageDataset(Base):
+    """Membership of a page in a dataset."""
+
+    __tablename__ = "page_dataset"
+    __table_args__ = (UniqueConstraint("page_id", "dataset_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    page_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("page.id", ondelete="CASCADE")
+    )
+    dataset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("dataset.id", ondelete="CASCADE")
+    )
+
+    page: Mapped[Page] = relationship(back_populates="datasets")
+    dataset: Mapped[Dataset] = relationship(back_populates="pages")
 
 
 class PageOrganization(Base):
@@ -150,30 +188,61 @@ class Position(Base):
     person: Mapped[Person] = relationship(back_populates="positions")
 
 
-async def import_pages(session: AsyncSession, rows: list[tuple[str, str]]) -> None:
-    """Append-only import of (url, organization) rows into the page catalogue.
+def _upsert_insert(session: AsyncSession):
+    """Return the session dialect's INSERT constructor with ON CONFLICT support.
 
-    Creates missing pages and page-organization associations; existing rows
-    are left untouched (insert-on-conflict does nothing). No updates or
-    deletes are ever performed.
+    Production runs on PostgreSQL; the test suite exercises the same
+    statements against in-memory SQLite. Both dialects offer
+    ``on_conflict_do_nothing`` with identical semantics.
     """
-    urls = list(dict.fromkeys(url for url, _ in rows))
+    match session.bind.dialect.name:
+        case "postgresql":
+            return postgres_insert
+        case "sqlite":
+            return sqlite_insert
+        case dialect:
+            raise ValueError(f"unsupported dialect: {dialect!r}")
+
+
+async def import_pages(session: AsyncSession, rows: list[tuple[str, str, str]]) -> None:
+    """Append-only import of (dataset, url, organization) rows into the catalogue.
+
+    Creates missing datasets, pages, and dataset/page-organization
+    associations; existing rows are left untouched (insert-on-conflict does
+    nothing). No updates or deletes are ever performed.
+    """
+    urls = list(dict.fromkeys(url for _, url, _ in rows))
     if not urls:
         return
+    insert = _upsert_insert(session)
+    names = list(dict.fromkeys(dataset for dataset, _, _ in rows))
+    memberships = sorted({(dataset, url) for dataset, url, _ in rows})
+    await session.execute(
+        insert(Dataset)
+        .values([{Dataset.name: name} for name in names])
+        .on_conflict_do_nothing(index_elements=[Dataset.name])
+    )
     await session.execute(
         insert(Page)
         .values([{Page.url: url} for url in urls])
         .on_conflict_do_nothing(index_elements=[Page.url])
     )
-    # Map url -> id for association inserts.
+    # Map url/dataset name -> id for association inserts.
     id_by_url = dict(
         (
             await session.execute(select(Page.url, Page.id).where(Page.url.in_(urls)))
         ).all()
     )
+    id_by_name = dict(
+        (
+            await session.execute(
+                select(Dataset.name, Dataset.id).where(Dataset.name.in_(names))
+            )
+        ).all()
+    )
     associations = [
         {PageOrganization.page_id: id_by_url[url], PageOrganization.organization: org}
-        for url, org in rows
+        for _, url, org in rows
         if org
     ]
     if associations:
@@ -184,6 +253,21 @@ async def import_pages(session: AsyncSession, rows: list[tuple[str, str]]) -> No
                 index_elements=[PageOrganization.page_id, PageOrganization.organization]
             )
         )
+    await session.execute(
+        insert(PageDataset)
+        .values(
+            [
+                {
+                    PageDataset.page_id: id_by_url[url],
+                    PageDataset.dataset_id: id_by_name[dataset],
+                }
+                for dataset, url in memberships
+            ]
+        )
+        .on_conflict_do_nothing(
+            index_elements=[PageDataset.page_id, PageDataset.dataset_id]
+        )
+    )
 
 
 async def select_pages(session: AsyncSession) -> list[Page]:

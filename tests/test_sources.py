@@ -9,7 +9,7 @@ def write_csv(fs, base, name, content):
         f.write(content)
 
 
-def test_load_inputs_merges_csvs_and_skips_blank_urls(tmp_path):
+def test_load_inputs_groups_rows_by_csv_and_skips_blank_urls(tmp_path):
     base = f"memory://{tmp_path.name}/inputs"
     fs = fsspec.filesystem("memory")
     write_csv(
@@ -28,9 +28,9 @@ def test_load_inputs_merges_csvs_and_skips_blank_urls(tmp_path):
         from funes.sources import load_inputs
 
         assert load_inputs(base) == [
-            ("https://a.example", "Org A"),
-            ("https://b.example", "Org B"),
-            ("https://c.example", "Org C"),
+            ("one", "https://a.example", "Org A"),
+            ("one", "https://b.example", "Org B"),
+            ("two", "https://c.example", "Org C"),
         ]
     finally:
         fs.rm(base, recursive=True)

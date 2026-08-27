@@ -26,7 +26,7 @@ def cli() -> None:
 @cli.command(
     help=(
         "Apply Pravda's packaged migrations, then Funes's own, then "
-        "append-only import URL/organization pairs from the input CSVs."
+        "append-only import dataset/URL/organization rows from the input CSVs."
     ),
 )
 def migrate_cmd() -> None:

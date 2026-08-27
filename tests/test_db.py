@@ -7,16 +7,22 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from funes.db import (
     Base,
+    Dataset,
     Inspection,
     Outcome,
     Page,
+    PageDataset,
+    PageOrganization,
     Person,
     Position,
+    import_pages,
     select_due_pages,
+    select_pages,
     store_inspection,
 )
 from funes.extract import Extraction as ExtractionResult
@@ -170,6 +176,93 @@ def test_store_inspection_rejects_inconsistent_combinations(kwargs, outcome):
             outcome=outcome,
             **kwargs,
         )
+
+
+# --- import_pages: append-only catalogue import against an in-memory SQLite DB ---
+
+
+def test_import_pages_creates_datasets_pages_and_memberships():
+    """A URL shared by two CSVs yields one page with two dataset memberships."""
+
+    def run() -> dict[str, list]:
+        async def scenario(session: AsyncSession) -> dict[str, list]:
+            await import_pages(
+                session,
+                [
+                    ("one", "https://a.example", "Org A"),
+                    ("one", "https://b.example", ""),
+                    ("two", "https://a.example", "Org A"),
+                ],
+            )
+            await session.commit()
+            datasets = (
+                (await session.execute(select(Dataset.name).order_by(Dataset.name)))
+                .scalars()
+                .all()
+            )
+            pages = [p.url for p in await select_pages(session)]
+            memberships = (
+                await session.execute(
+                    select(Page.url, Dataset.name)
+                    .join(PageDataset, PageDataset.page_id == Page.id)
+                    .join(Dataset, Dataset.id == PageDataset.dataset_id)
+                    .order_by(Page.url, Dataset.name)
+                )
+            ).all()
+            organizations = (
+                await session.execute(
+                    select(Page.url, PageOrganization.organization).join(
+                        PageOrganization, PageOrganization.page_id == Page.id
+                    )
+                )
+            ).all()
+            return {
+                "datasets": list(datasets),
+                "pages": pages,
+                "memberships": memberships,
+                "organizations": organizations,
+            }
+
+        return asyncio.run(run_with_session(scenario))
+
+    assert run() == {
+        "datasets": ["one", "two"],
+        "pages": ["https://a.example", "https://b.example"],
+        "memberships": [
+            ("https://a.example", "one"),
+            ("https://a.example", "two"),
+            ("https://b.example", "one"),
+        ],
+        # The blank organization on https://b.example yields no association.
+        "organizations": [("https://a.example", "Org A")],
+    }
+
+
+def test_import_pages_is_append_only():
+    """Re-importing identical rows changes nothing."""
+
+    def run() -> tuple[int, int, int]:
+        rows = [("one", "https://a.example", "Org A")]
+
+        async def scenario(session: AsyncSession) -> tuple[int, int, int]:
+            await import_pages(session, rows)
+            await session.commit()
+            await import_pages(session, rows)
+            await session.commit()
+            counts = (
+                await session.execute(
+                    select(
+                        func.count(select(Page.id).scalar_subquery()),
+                        func.count(select(PageOrganization.id).scalar_subquery()),
+                        func.count(select(PageDataset.id).scalar_subquery()),
+                    )
+                )
+            ).one()
+            return tuple(counts)
+
+        return asyncio.run(run_with_session(scenario))
+
+    assert run() == (1, 1, 1)
 
 
 # --- select_due_pages: real queries against an in-memory async SQLite DB ---
