@@ -12,7 +12,7 @@ REQUIRED_VARS = {
     "PRAVDA_STORAGE_BASE_PATH": "memory://storage",
     "INPUT_BASE_PATH": "./datasets",
     "SESSIONS_BASE_PATH": "./sessions",
-    "OPENAI_MODEL": "test-model",
+    "MODEL": "openai:test-model",
     "REVISIT_INTERVAL_DAYS": "30",
 }
 

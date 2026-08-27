@@ -220,7 +220,7 @@ def test_view_resource_reads_through_dependencies():
 def _extraction_agent():
     # Every run below overrides the model, and ALLOW_MODEL_REQUESTS blocks
     # real requests; construction only needs a syntactically present key.
-    return build_extraction_agent("gpt-5")
+    return build_extraction_agent("openai:gpt-5")
 
 
 def test_agent_test_model_views_resource_and_extracts():

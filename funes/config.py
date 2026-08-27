@@ -46,7 +46,7 @@ def load_config() -> Config:
             browser_ws_url=os.environ["PRAVDA_BROWSER_WS_URL"],
             storage_base_path=os.environ["PRAVDA_STORAGE_BASE_PATH"],
         ),
-        model=ModelConfig(name=os.environ["OPENAI_MODEL"]),
+        model=ModelConfig(name=os.environ["MODEL"]),
         input=InputConfig(
             base_path=os.environ["INPUT_BASE_PATH"],
         ),

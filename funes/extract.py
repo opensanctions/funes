@@ -311,19 +311,22 @@ async def view_resource(
 
 
 def build_extraction_agent(
-    model_name: str,
+    model: str,
 ) -> Agent[ExtractionDependencies, PageResult]:
-    """Build the reusable extraction agent for *model_name*.
+    """Build the reusable extraction agent for *model*.
 
     Tool-based structured output into ``PageResult`` (an ``Extraction`` or a
     ``BrokenPage``, discriminated by ``kind``). The agent's single tool,
     ``view_resource``, lets the model view captured images referenced by body
     paths in the DOM outline; callers must pass matching
-    ``ExtractionDependencies`` with every ``agent.run`` call. The ``openai:``
-    prefix resolves to the Responses API.
+    ``ExtractionDependencies`` with every ``agent.run`` call.
+
+    *model* is a full Pydantic AI model id (``provider:model``, e.g.
+    ``openai:gpt-5.6-luna`` or ``anthropic:claude-sonnet-4-6``) passed straight
+    through, so the provider is chosen by configuration.
     """
     return Agent(
-        f"openai:{model_name}",
+        model,
         name="extraction",
         output_type=PageResult,
         instructions=_EXTRACTION_INSTRUCTIONS,

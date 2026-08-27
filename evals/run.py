@@ -34,7 +34,7 @@ def main() -> int:
     parser.add_argument(
         "--model",
         default=None,
-        help="model name; defaults to OPENAI_MODEL from the environment",
+        help="model id (provider:model); defaults to MODEL from the environment",
     )
     args = parser.parse_args()
     model = args.model or load_config().model.name
