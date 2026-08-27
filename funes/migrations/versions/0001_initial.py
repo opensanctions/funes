@@ -65,6 +65,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("snapshot_id"),
     )
+    op.create_index(
+        "ix_attempt_candidate_created", "attempt", ["candidate_id", "created_at"]
+    )
     op.create_table(
         "snapshot_assessment",
         sa.Column("snapshot_id", sa.Uuid(), nullable=False),
@@ -122,6 +125,7 @@ def downgrade() -> None:
     op.drop_table("person")
     op.drop_table("inspection")
     op.drop_table("snapshot_assessment")
+    op.drop_index("ix_attempt_candidate_created", table_name="attempt")
     op.drop_table("attempt")
     op.drop_table("candidate")
     op.drop_table("url")

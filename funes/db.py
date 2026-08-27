@@ -9,6 +9,7 @@ from sqlalchemy import (
     JSON,
     DateTime,
     ForeignKey,
+    Index,
     Text,
     UniqueConstraint,
     func,
@@ -136,8 +137,11 @@ class Attempt(Base):
     """
 
     __tablename__ = "attempt"
+    __table_args__ = (
+        Index("ix_attempt_candidate_created", "candidate_id", "created_at"),
+    )
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     candidate_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("candidate.id", ondelete="CASCADE")
     )
@@ -147,6 +151,7 @@ class Attempt(Base):
 
     candidate: Mapped[Candidate] = relationship(back_populates="attempts")
     assessment: Mapped["SnapshotAssessment | None"] = relationship(
+        back_populates="attempt",
         primaryjoin="Attempt.snapshot_id == SnapshotAssessment.snapshot_id",
         foreign_keys="SnapshotAssessment.snapshot_id",
         uselist=False,
@@ -169,6 +174,13 @@ class SnapshotAssessment(Base):
     reason: Mapped[str | None] = mapped_column(Text)
     model: Mapped[str | None] = mapped_column(Text)
     assessed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    attempt: Mapped[Attempt] = relationship(
+        back_populates="assessment",
+        primaryjoin="Attempt.snapshot_id == SnapshotAssessment.snapshot_id",
+        foreign_keys=[snapshot_id],
+        uselist=False,
+    )
 
 
 class Inspection(Base):
@@ -350,14 +362,15 @@ async def select_candidates(session: AsyncSession) -> list[Candidate]:
 
     Ordered by dataset name, objective description, then url, so callers
     (enqueueing, tests) see a stable sequence regardless of insert order.
-    Related objective, url, and attempts are eagerly loaded.
+    Related objective (with its dataset) and url are eagerly loaded; the
+    attempt history is deliberately not loaded, so queueing never pulls
+    an unbounded inspection history.
     """
     stmt = (
         select(Candidate)
         .options(
             selectinload(Candidate.objective).selectinload(Objective.dataset),
             selectinload(Candidate.url),
-            selectinload(Candidate.attempts),
         )
         .join(Objective, Objective.id == Candidate.objective_id)
         .join(Dataset, Dataset.id == Objective.dataset_id)
@@ -403,7 +416,6 @@ async def select_due_candidates(
         .options(
             selectinload(Candidate.objective).selectinload(Objective.dataset),
             selectinload(Candidate.url),
-            selectinload(Candidate.attempts),
         )
         .join(Objective, Objective.id == Candidate.objective_id)
         .join(Dataset, Dataset.id == Objective.dataset_id)
@@ -429,6 +441,7 @@ async def select_due_candidates(
 def store_broken_attempt(
     session: AsyncSession,
     *,
+    attempt_id: uuid.UUID,
     candidate_id: uuid.UUID,
     snapshot: Snapshot,
     reason: str,
@@ -436,14 +449,17 @@ def store_broken_attempt(
 ) -> Attempt:
     """Construct one terminal broken-snapshot aggregate and add it.
 
-    Creates the Attempt and its BROKEN SnapshotAssessment; no Inspection
-    or person graph. ``reason`` is required; ``model`` is set only when the
-    model itself concluded the snapshot is broken.
+    Creates the Attempt (with the caller-allocated ``attempt_id`` — the
+    Pydantic run/session id and repair routing id) and its BROKEN
+    SnapshotAssessment; no Inspection or person graph. ``reason`` is
+    required; ``model`` is set only when the model itself concluded the
+    snapshot is broken.
     """
     if not reason or not reason.strip():
         raise ValueError("broken attempt requires a non-blank reason")
     now = _now()
     attempt = Attempt(
+        id=attempt_id,
         candidate_id=candidate_id,
         snapshot_id=snapshot.id,
         captured_at=snapshot.captured_at,
@@ -463,6 +479,7 @@ def store_broken_attempt(
 def store_inspection(
     session: AsyncSession,
     *,
+    attempt_id: uuid.UUID,
     candidate_id: uuid.UUID,
     snapshot: Snapshot,
     result: Hit | Miss,
@@ -470,10 +487,11 @@ def store_inspection(
 ) -> Inspection:
     """Construct one terminal Hit/Miss model-result aggregate and add it.
 
-    Creates the Attempt, its USABLE SnapshotAssessment, and the Inspection.
-    A Hit maps the person/position graph and must not carry a reason; a
-    Miss carries its reason and no people. ``model`` is required. Unknown
-    result types (including BrokenSnapshot) are rejected.
+    Creates the Attempt (with the caller-allocated ``attempt_id``), its
+    USABLE SnapshotAssessment, and the Inspection. A Hit maps the
+    person/position graph and must not carry a reason; a Miss carries its
+    reason and no people. ``model`` is required. Unknown result types
+    (including BrokenSnapshot) are rejected.
     """
     if not model or not model.strip():
         raise ValueError("inspection requires a model")
@@ -509,6 +527,7 @@ def store_inspection(
         case other:
             raise ValueError(f"unknown result type: {type(other).__name__}")
     attempt = Attempt(
+        id=attempt_id,
         candidate_id=candidate_id,
         snapshot_id=snapshot.id,
         captured_at=snapshot.captured_at,

@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import selectinload
 
 from funes.db import (
     Attempt,
@@ -200,14 +201,17 @@ def test_store_broken_attempt_deterministic():
     candidate_id = uuid4()
     snapshot = make_snapshot()
 
+    attempt_id = uuid4()
     attempt = store_broken_attempt(
         session,
+        attempt_id=attempt_id,
         candidate_id=candidate_id,
         snapshot=snapshot,
         reason="capture failed: net error",
     )
 
     assert isinstance(attempt, Attempt)
+    assert attempt.id == attempt_id
     assert session.added == [attempt]
     assert attempt.candidate_id == candidate_id
     assert attempt.snapshot_id == snapshot.id
@@ -228,6 +232,7 @@ def test_store_broken_attempt_model_detected():
 
     attempt = store_broken_attempt(
         session,
+        attempt_id=uuid4(),
         candidate_id=uuid4(),
         snapshot=make_snapshot(),
         reason="Cloudflare challenge page",
@@ -239,11 +244,63 @@ def test_store_broken_attempt_model_detected():
     assert attempt.inspection is None
 
 
+def test_stored_aggregates_navigate_from_assessment_to_candidate():
+    """Repair code loads an assessment and walks to its attempt and candidate."""
+
+    def run() -> tuple[str, str, str, str]:
+        async def scenario(session: AsyncSession) -> tuple[str, str, str, str]:
+            candidate = await add_candidate(
+                session, "one", "find board members", "https://a.example"
+            )
+            attempt = store_broken_attempt(
+                session,
+                attempt_id=uuid4(),
+                candidate_id=candidate.id,
+                snapshot=make_snapshot(),
+                reason="Cloudflare challenge",
+                model="openai:gpt-test",
+            )
+            await session.commit()
+            loaded = (
+                await session.execute(
+                    select(SnapshotAssessment)
+                    .options(
+                        selectinload(SnapshotAssessment.attempt)
+                        .selectinload(Attempt.candidate)
+                        .selectinload(Candidate.url),
+                        selectinload(SnapshotAssessment.attempt)
+                        .selectinload(Attempt.candidate)
+                        .selectinload(Candidate.objective),
+                    )
+                    .where(SnapshotAssessment.snapshot_id == attempt.snapshot_id)
+                )
+            ).scalar_one()
+            return (
+                loaded.attempt.id == attempt.id and "attempt",
+                loaded.attempt.candidate.url.url,
+                loaded.attempt.candidate.objective.description,
+                loaded.reason or "",
+            )
+
+        return asyncio.run(run_with_session(scenario))
+
+    assert run() == (
+        "attempt",
+        "https://a.example",
+        "find board members",
+        "Cloudflare challenge",
+    )
+
+
 def test_store_broken_attempt_requires_reason():
     session = FakeSession()
     with pytest.raises(ValueError):
         store_broken_attempt(
-            session, candidate_id=uuid4(), snapshot=make_snapshot(), reason="  "
+            session,
+            attempt_id=uuid4(),
+            candidate_id=uuid4(),
+            snapshot=make_snapshot(),
+            reason="  ",
         )
     assert session.added == []
 
@@ -253,8 +310,10 @@ def test_store_inspection_hit_maps_person_graph():
     candidate_id = uuid4()
     snapshot = make_snapshot()
 
+    attempt_id = uuid4()
     inspection = store_inspection(
         session,
+        attempt_id=attempt_id,
         candidate_id=candidate_id,
         snapshot=snapshot,
         result=make_hit(),
@@ -264,6 +323,7 @@ def test_store_inspection_hit_maps_person_graph():
     assert isinstance(inspection, Inspection)
     assert session.added == [inspection.attempt]
     attempt = inspection.attempt
+    assert attempt.id == attempt_id
     assert attempt.candidate_id == candidate_id
     assert attempt.snapshot_id == snapshot.id
     assert attempt.captured_at == snapshot.captured_at
@@ -293,6 +353,7 @@ def test_store_inspection_miss_has_reason_and_no_graph():
 
     inspection = store_inspection(
         session,
+        attempt_id=uuid4(),
         candidate_id=uuid4(),
         snapshot=make_snapshot(),
         result=Miss(reason="page lists press releases only"),
@@ -311,6 +372,7 @@ def test_store_inspection_requires_model():
     with pytest.raises(ValueError):
         store_inspection(
             session,
+            attempt_id=uuid4(),
             candidate_id=uuid4(),
             snapshot=make_snapshot(),
             result=Miss(reason="nothing here"),
@@ -324,6 +386,7 @@ def test_store_inspection_rejects_broken_and_unknown_results():
     with pytest.raises(ValueError):
         store_inspection(
             session,
+            attempt_id=uuid4(),
             candidate_id=uuid4(),
             snapshot=make_snapshot(),
             result=BrokenSnapshot(reason="challenge page"),
@@ -332,6 +395,7 @@ def test_store_inspection_rejects_broken_and_unknown_results():
     with pytest.raises(ValueError):
         store_inspection(
             session,
+            attempt_id=uuid4(),
             candidate_id=uuid4(),
             snapshot=make_snapshot(),
             result=object(),  # type: ignore[arg-type]
