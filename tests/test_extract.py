@@ -1,4 +1,4 @@
-"""Tests for the extraction schema, prompts, tools, and broken-page union."""
+"""Tests for the extraction schema, prompts, tools, and result union."""
 
 import asyncio
 
@@ -16,9 +16,10 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 
 from funes.extract import (
-    BrokenPage,
-    Extraction,
+    BrokenSnapshot,
     ExtractionDependencies,
+    Hit,
+    Miss,
     PageMetadata,
     PageResult,
     Person,
@@ -31,36 +32,83 @@ from funes.extract import (
 
 result_adapter = TypeAdapter(PageResult)
 
+_PERSON = {
+    "name": "Amina Diallo",
+    "countries": ["Senegal"],
+    "positions": [
+        {
+            "name": "Director",
+            "organization": "Example Foundation",
+            "start_date": "2021",
+        },
+        {"name": "Chair", "organization": "Example Foundation"},
+    ],
+}
 
-def test_broken_page_default_kind_and_reason_required():
-    broken = BrokenPage(reason="Cloudflare challenge")
+
+# --- union discrimination and validation ---
+
+
+def test_hit_requires_at_least_one_person():
+    assert (
+        Hit(persons=[{"name": "A", "positions": [{"name": "Director"}]}]).kind == "hit"
+    )
+    with pytest.raises(ValidationError):
+        Hit(persons=[])
+    with pytest.raises(ValidationError):
+        Hit()
+
+
+def test_miss_requires_nonblank_reason():
+    miss = Miss(reason="No board members listed; page is a news article.")
+    assert miss.kind == "miss"
+    with pytest.raises(ValidationError):
+        Miss()
+    with pytest.raises(ValidationError):
+        Miss(reason="")
+    with pytest.raises(ValidationError):
+        Miss(reason="   ")
+
+
+def test_broken_snapshot_requires_nonblank_reason():
+    broken = BrokenSnapshot(reason="Cloudflare challenge")
     assert broken.kind == "broken"
     with pytest.raises(ValidationError):
-        BrokenPage()
+        BrokenSnapshot()
     with pytest.raises(ValidationError):
-        BrokenPage(reason="")
+        BrokenSnapshot(reason="")
     with pytest.raises(ValidationError):
-        BrokenPage(reason="   ")
+        BrokenSnapshot(reason="   ")
 
 
 def test_union_discriminates_on_kind():
+    hit_payload = {
+        "kind": "hit",
+        "persons": [{"name": "Amina Diallo", "positions": [{"name": "Director"}]}],
+    }
+    assert isinstance(result_adapter.validate_python(hit_payload), Hit)
     assert isinstance(
-        result_adapter.validate_python({"kind": "extraction"}), Extraction
+        result_adapter.validate_python({"kind": "miss", "reason": "no holders"}), Miss
     )
     assert isinstance(
-        result_adapter.validate_python({"kind": "broken", "reason": "404"}), BrokenPage
+        result_adapter.validate_python({"kind": "broken", "reason": "404"}),
+        BrokenSnapshot,
     )
     with pytest.raises(ValidationError):
         result_adapter.validate_python({"kind": "other"})
+    with pytest.raises(ValidationError):
+        result_adapter.validate_python({"kind": "hit"})
 
 
 def test_union_rejects_payload_missing_kind():
-    # Without kind, the discriminated union must fail loudly rather than
-    # letting the payload silently validate as an Extraction.
+    # Without kind, the discriminated union must fail loudly.
     with pytest.raises(ValidationError):
         result_adapter.validate_python({"reason": "404"})
     with pytest.raises(ValidationError):
         result_adapter.validate_python({"persons": []})
+
+
+# --- view_resource tool ---
 
 
 def _view_agent(function):
@@ -223,7 +271,71 @@ def _extraction_agent():
     return build_extraction_agent("openai:gpt-5")
 
 
-def test_agent_test_model_views_resource_and_extracts():
+def test_agent_function_model_returns_hit_with_nested_graph():
+    agent = _extraction_agent()
+
+    def fn(messages, info):
+        return ModelResponse(
+            parts=[
+                ToolCallPart("final_result_Hit", {"kind": "hit", "persons": [_PERSON]})
+            ]
+        )
+
+    with agent.override(model=FunctionModel(fn)):
+        result = asyncio.run(agent.run("ignored prompt", deps=_deps({})))
+
+    assert isinstance(result.output, Hit)
+    [returned] = result.output.persons
+    assert isinstance(returned, Person)
+    assert returned.name == "Amina Diallo"
+    assert returned.countries == ["Senegal"]
+    assert [p.name for p in returned.positions] == ["Director", "Chair"]
+    assert isinstance(returned.positions[0], Position)
+    assert returned.positions[0].organization == "Example Foundation"
+    assert returned.positions[0].start_date == "2021"
+
+
+def test_agent_function_model_returns_miss():
+    agent = _extraction_agent()
+
+    def fn(messages, info):
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    "final_result_Miss",
+                    {"kind": "miss", "reason": "No officeholders; news article."},
+                )
+            ]
+        )
+
+    with agent.override(model=FunctionModel(fn)):
+        result = asyncio.run(agent.run("ignored prompt", deps=_deps({})))
+
+    assert isinstance(result.output, Miss)
+    assert result.output.reason == "No officeholders; news article."
+
+
+def test_agent_function_model_returns_broken_snapshot():
+    agent = _extraction_agent()
+
+    def fn(messages, info):
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    "final_result_BrokenSnapshot",
+                    {"kind": "broken", "reason": "Cloudflare challenge"},
+                )
+            ]
+        )
+
+    with agent.override(model=FunctionModel(fn)):
+        result = asyncio.run(agent.run("ignored prompt", deps=_deps({})))
+
+    assert isinstance(result.output, BrokenSnapshot)
+    assert result.output.reason == "Cloudflare challenge"
+
+
+def test_agent_test_model_views_resource_and_produces_valid_result():
     agent = _extraction_agent()
     # TestModel generates 'a' for a string argument, so the media-type map
     # must carry that body path for the generated tool call to succeed.
@@ -231,7 +343,9 @@ def test_agent_test_model_views_resource_and_extracts():
     with agent.override(model=TestModel()):
         result = asyncio.run(agent.run("ignored prompt", deps=deps))
 
-    assert result.output == Extraction(persons=[])
+    # TestModel satisfies the schema with a minimal valid output; the run
+    # must end in a member of the union, whichever member it picks.
+    assert isinstance(result.output, (Hit, Miss, BrokenSnapshot))
     parts = _tool_return_part(result)
     [call] = [
         p
@@ -249,76 +363,82 @@ def test_agent_test_model_views_resource_and_extracts():
     )
 
 
-def test_agent_returns_nested_extraction_graph():
-    agent = _extraction_agent()
-    person = {
-        "name": "Amina Diallo",
-        "countries": ["Senegal"],
-        "positions": [
-            {
-                "name": "Director",
-                "organization": "Example Foundation",
-                "start_date": "2021",
-            },
-            {"name": "Chair", "organization": "Example Foundation"},
-        ],
-    }
-
-    def fn(messages, info):
-        return ModelResponse(
-            parts=[
-                ToolCallPart(
-                    "final_result_Extraction",
-                    {"kind": "extraction", "persons": [person]},
-                )
-            ]
-        )
-
-    with agent.override(model=FunctionModel(fn)):
-        result = asyncio.run(agent.run("ignored prompt", deps=_deps({})))
-
-    assert isinstance(result.output, Extraction)
-    [returned] = result.output.persons
-    assert isinstance(returned, Person)
-    assert returned.name == "Amina Diallo"
-    assert returned.countries == ["Senegal"]
-    assert [p.name for p in returned.positions] == ["Director", "Chair"]
-    assert isinstance(returned.positions[0], Position)
-    assert returned.positions[0].organization == "Example Foundation"
-    assert returned.positions[0].start_date == "2021"
+# --- prompt construction ---
 
 
-def test_agent_returns_broken_page():
-    agent = _extraction_agent()
-
-    def fn(messages, info):
-        return ModelResponse(
-            parts=[
-                ToolCallPart(
-                    "final_result_BrokenPage",
-                    {"kind": "broken", "reason": "Cloudflare challenge"},
-                )
-            ]
-        )
-
-    with agent.override(model=FunctionModel(fn)):
-        result = asyncio.run(agent.run("ignored prompt", deps=_deps({})))
-
-    assert isinstance(result.output, BrokenPage)
-    assert result.output.reason == "Cloudflare challenge"
-
-
-def test_extraction_with_persons_still_valid():
-    extraction = result_adapter.validate_python(
-        {
-            "kind": "extraction",
-            "persons": [{"name": "Amina Diallo", "positions": [{"name": "Director"}]}],
-        }
+def test_build_prompt_includes_delimited_objective_before_page_context():
+    metadata = PageMetadata(
+        requested_url="https://example.org/x",
+        final_url="https://example.org/y",
+        title="T",
+        description=None,
     )
-    assert isinstance(extraction, Extraction)
-    person = extraction.persons[0]
-    assert isinstance(person, Person)
-    assert isinstance(person.positions[0], Position)
+    objective = "Identify the current members of the country's cabinet."
+    prompt = build_prompt(objective, metadata, '- h1 "Cabinet"')
+    assert "<objective>" in prompt and "</objective>" in prompt
+    assert objective in prompt
+    # The objective block comes before the page source context.
+    assert prompt.index("<objective>") < prompt.index("<page_metadata>")
+    assert prompt.index("<objective>") < prompt.index("<page_outline>")
+
+
+def test_build_prompt_rejects_blank_objective():
+    metadata = PageMetadata(
+        requested_url="https://example.org",
+        final_url="https://example.org",
+        title=None,
+        description=None,
+    )
+    for objective in ("", "   ", "\n\t"):
+        with pytest.raises(ValueError):
+            build_prompt(objective, metadata, '- text: "x"')
+
+
+def test_build_prompt_strips_surrounding_whitespace_from_objective():
+    metadata = PageMetadata(
+        requested_url="https://example.org",
+        final_url="https://example.org",
+        title=None,
+        description=None,
+    )
+    prompt = build_prompt("\n  Find the mayors.  \n", metadata, '- text: "x"')
+    assert "<objective>\nFind the mayors.\n</objective>" in prompt
+
+
+def test_build_prompt_marks_context_and_includes_error():
+    metadata = PageMetadata(
+        requested_url="https://example.org/x",
+        final_url="https://example.org/y",
+        http_status=503,
+        capture_error="navigation timeout",
+        title="T",
+        description=None,
+    )
+    outline = '- main:\n  - h1 "Board"\n  - img "logo" [src=https://example.org/l.png] [body=bodies/l.png]'
+    prompt = build_prompt("Find the board members.", metadata, outline)
+    assert "Requested URL (context only): https://example.org/x" in prompt
+    assert "Final URL (context only): https://example.org/y" in prompt
+    assert "HTTP status (context only): 503" in prompt
+    assert "Capture error (context only): navigation timeout" in prompt
+    assert "Document title: T" in prompt
+    assert "Meta description: [not provided]" in prompt
+    assert f"<page_outline>\n{outline}\n</page_outline>" in prompt
+
+
+def test_build_prompt_omits_absent_optional_fields():
+    metadata = PageMetadata(
+        requested_url="https://example.org",
+        final_url="https://example.org",
+        title=None,
+        description=None,
+    )
+    prompt = build_prompt("List the mayors.", metadata, '- text: "empty"')
+    assert "Capture error" not in prompt
+    assert "HTTP status (context only): [not provided]" in prompt
+    assert '<page_outline>\n- text: "empty"\n</page_outline>' in prompt
+
+
+# --- metadata_from_html ---
 
 
 def test_metadata_from_html_fields():
@@ -355,37 +475,3 @@ def test_metadata_from_html_empty_page():
     assert metadata.description is None
     assert metadata.http_status is None
     assert metadata.capture_error is None
-
-
-def test_build_prompt_marks_context_and_includes_error():
-    metadata = PageMetadata(
-        requested_url="https://example.org/x",
-        final_url="https://example.org/y",
-        http_status=503,
-        capture_error="navigation timeout",
-        title="T",
-        description=None,
-    )
-    outline = '- main:\n  - h1 "Board"\n  - img "logo" [src=https://example.org/l.png] [body=bodies/l.png]'
-    prompt = build_prompt(metadata, outline)
-    assert "Requested URL (context only): https://example.org/x" in prompt
-    assert "Final URL (context only): https://example.org/y" in prompt
-    assert "HTTP status (context only): 503" in prompt
-    assert "Capture error (context only): navigation timeout" in prompt
-    assert "Document title: T" in prompt
-    assert "Meta description: [not provided]" in prompt
-    assert f"<page_outline>\n{outline}\n</page_outline>" in prompt
-    assert "<page_text>" not in prompt
-
-
-def test_build_prompt_omits_absent_optional_fields():
-    metadata = PageMetadata(
-        requested_url="https://example.org",
-        final_url="https://example.org",
-        title=None,
-        description=None,
-    )
-    prompt = build_prompt(metadata, '- text: "empty"')
-    assert "Capture error" not in prompt
-    assert "HTTP status (context only): [not provided]" in prompt
-    assert '<page_outline>\n- text: "empty"\n</page_outline>' in prompt
