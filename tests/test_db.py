@@ -1,37 +1,41 @@
-"""Unit tests for inspection-ledger persistence."""
+"""Behavior tests for the candidate/attempt persistence backbone."""
 
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from funes.db import (
+    Attempt,
     Base,
+    Candidate,
     Dataset,
     Inspection,
-    Outcome,
-    Page,
-    PageDataset,
-    PageOrganization,
+    InspectionOutcome,
+    Objective,
     Person,
     Position,
-    import_pages,
-    select_due_pages,
-    select_pages,
+    SnapshotAssessment,
+    SnapshotStatus,
+    Url,
+    import_candidates,
+    select_candidates,
+    select_due_candidates,
+    store_broken_attempt,
     store_inspection,
 )
-from funes.extract import Extraction as ExtractionResult
+from funes.extract import BrokenSnapshot, Hit, Miss
 from funes.extract import Person as PersonResult
 from funes.extract import Position as PositionResult
 
 
 class FakeSession:
-    """Collects add calls so persisted graphs can be inspected."""
+    """Collects add calls so persisted aggregates can be inspected."""
 
     def __init__(self) -> None:
         self.added: list[object] = []
@@ -44,154 +48,39 @@ def make_snapshot() -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), captured_at=datetime.now(UTC))
 
 
-def make_result(persons: list[PersonResult] | None = None) -> ExtractionResult:
-    return ExtractionResult(persons=persons or [])
-
-
-def test_store_inspection_productive_persists_completed_graph():
-    session = FakeSession()
-    inspection_id = uuid4()
-    page_id = uuid4()
-    snapshot = make_snapshot()
-    result = make_result(
-        [
+def make_hit() -> Hit:
+    return Hit(
+        persons=[
             PersonResult(
                 name="Jane Doe",
                 countries=["Utopia"],
-                positions=[PositionResult(name="Chair", organization="Board")],
-            )
+                positions=[
+                    PositionResult(name="Chair", organization="Board"),
+                    PositionResult(name="Trustee", organization="Fund"),
+                ],
+            ),
+            PersonResult(
+                name="John Roe",
+                positions=[PositionResult(name="Director")],
+            ),
         ]
     )
 
-    inspection = store_inspection(
-        session,
-        inspection_id=inspection_id,
-        page_id=page_id,
-        outcome=Outcome.PRODUCTIVE,
-        model="test-model",
-        snapshot=snapshot,
-        result=result,
-    )
 
-    assert isinstance(inspection, Inspection)
-    assert inspection.id == inspection_id
-    assert inspection.page_id == page_id
-    assert inspection.outcome == Outcome.PRODUCTIVE
-    assert inspection.reason is None
-    assert inspection.model == "test-model"
-    assert inspection.snapshot_id == snapshot.id
-    assert inspection.captured_at == snapshot.captured_at
-    assert inspection.extracted_at is not None
-    assert session.added == [inspection]
-
-    persons = inspection.persons
-    assert [p.name for p in persons] == ["Jane Doe"]
-    assert [p.inspection_id for p in persons] == [inspection_id]
-    positions: list[Position] = persons[0].positions
-    assert [pos.name for pos in positions] == ["Chair"]
-    assert positions[0].organization == "Board"
+# --- import_candidates: append-only catalogue import against in-memory SQLite ---
 
 
-def test_store_inspection_empty_outcome_has_no_graph():
-    session = FakeSession()
-
-    inspection = store_inspection(
-        session,
-        inspection_id=uuid4(),
-        page_id=uuid4(),
-        outcome=Outcome.EMPTY,
-        model="test-model",
-        snapshot=make_snapshot(),
-        result=make_result(),
-    )
-
-    assert inspection.outcome == Outcome.EMPTY
-    assert inspection.extracted_at is not None
-    assert inspection.persons == []
-    assert all(not isinstance(obj, Person) for obj in session.added)
-
-
-def test_store_inspection_broken_at_capture():
-    session = FakeSession()
-    snapshot = make_snapshot()
-
-    inspection = store_inspection(
-        session,
-        inspection_id=uuid4(),
-        page_id=uuid4(),
-        outcome=Outcome.BROKEN,
-        snapshot=snapshot,
-        reason="capture failed: net error",
-    )
-
-    assert inspection.outcome == Outcome.BROKEN
-    assert inspection.reason == "capture failed: net error"
-    assert inspection.model is None
-    assert inspection.extracted_at is None
-    assert inspection.snapshot_id == snapshot.id
-    assert inspection.persons == []
-
-
-def test_store_inspection_broken_by_model_verdict():
-    session = FakeSession()
-
-    inspection = store_inspection(
-        session,
-        inspection_id=uuid4(),
-        page_id=uuid4(),
-        outcome=Outcome.BROKEN,
-        model="test-model",
-        snapshot=make_snapshot(),
-        reason="model: page is a PDF index with no content",
-    )
-
-    assert inspection.outcome == Outcome.BROKEN
-    assert inspection.model == "test-model"
-    assert inspection.extracted_at is None
-    assert inspection.reason is not None
-
-
-@pytest.mark.parametrize(
-    ("kwargs", "outcome"),
-    [
-        # productive/empty: model, result required; reason forbidden.
-        ({"model": None, "result": make_result()}, Outcome.PRODUCTIVE),
-        ({"model": "m", "result": None}, Outcome.PRODUCTIVE),
-        ({"model": "m", "result": make_result(), "reason": "why"}, Outcome.PRODUCTIVE),
-        ({"model": None, "result": make_result()}, Outcome.EMPTY),
-        ({"model": "m", "result": None}, Outcome.EMPTY),
-        # broken: reason required; result forbidden.
-        ({}, Outcome.BROKEN),
-        ({"reason": "r", "result": make_result()}, Outcome.BROKEN),
-    ],
-)
-def test_store_inspection_rejects_inconsistent_combinations(kwargs, outcome):
-    session = FakeSession()
-    with pytest.raises(ValueError):
-        store_inspection(
-            session,
-            inspection_id=uuid4(),
-            page_id=uuid4(),
-            snapshot=make_snapshot(),
-            outcome=outcome,
-            **kwargs,
-        )
-
-
-# --- import_pages: append-only catalogue import against an in-memory SQLite DB ---
-
-
-def test_import_pages_creates_datasets_pages_and_memberships():
-    """A URL shared by two CSVs yields one page with two dataset memberships."""
+def test_import_candidates_creates_full_catalogue():
+    """One objective with several URLs, and one URL under two objectives."""
 
     def run() -> dict[str, list]:
         async def scenario(session: AsyncSession) -> dict[str, list]:
-            await import_pages(
+            await import_candidates(
                 session,
                 [
-                    ("one", "https://a.example", "Org A"),
-                    ("one", "https://b.example", ""),
-                    ("two", "https://a.example", "Org A"),
+                    ("one", "find board members", "https://a.example"),
+                    ("one", "find board members", "https://b.example"),
+                    ("two", "find legislators", "https://a.example"),
                 ],
             )
             await session.commit()
@@ -200,158 +89,458 @@ def test_import_pages_creates_datasets_pages_and_memberships():
                 .scalars()
                 .all()
             )
-            pages = [p.url for p in await select_pages(session)]
-            memberships = (
+            rows = (
                 await session.execute(
-                    select(Page.url, Dataset.name)
-                    .join(PageDataset, PageDataset.page_id == Page.id)
-                    .join(Dataset, Dataset.id == PageDataset.dataset_id)
-                    .order_by(Page.url, Dataset.name)
+                    select(Dataset.name, Objective.description, Url.url)
+                    .join(Objective, Objective.dataset_id == Dataset.id)
+                    .join(Candidate, Candidate.objective_id == Objective.id)
+                    .join(Url, Url.id == Candidate.url_id)
+                    .order_by(Dataset.name, Objective.description, Url.url)
                 )
             ).all()
-            organizations = (
-                await session.execute(
-                    select(Page.url, PageOrganization.organization).join(
-                        PageOrganization, PageOrganization.page_id == Page.id
+            objective_counts = (
+                (
+                    await session.execute(
+                        select(func.count())
+                        .select_from(Objective)
+                        .group_by(Objective.dataset_id)
+                        .order_by(func.count())
                     )
                 )
-            ).all()
+                .scalars()
+                .all()
+            )
             return {
                 "datasets": list(datasets),
-                "pages": pages,
-                "memberships": memberships,
-                "organizations": organizations,
+                "rows": rows,
+                "objective_counts": list(objective_counts),
             }
 
         return asyncio.run(run_with_session(scenario))
 
     assert run() == {
         "datasets": ["one", "two"],
-        "pages": ["https://a.example", "https://b.example"],
-        "memberships": [
-            ("https://a.example", "one"),
-            ("https://a.example", "two"),
-            ("https://b.example", "one"),
+        # One url row shared by both objectives; one candidate per pairing.
+        "rows": [
+            ("one", "find board members", "https://a.example"),
+            ("one", "find board members", "https://b.example"),
+            ("two", "find legislators", "https://a.example"),
         ],
-        # The blank organization on https://b.example yields no association.
-        "organizations": [("https://a.example", "Org A")],
+        # Dataset one owns one objective covering both urls; dataset two owns one.
+        "objective_counts": [1, 1],
     }
 
 
-def test_import_pages_is_append_only():
+def test_import_candidates_is_idempotent():
     """Re-importing identical rows changes nothing."""
 
-    def run() -> tuple[int, int, int]:
-        rows = [("one", "https://a.example", "Org A")]
+    def run() -> tuple[int, int, int, int]:
+        rows = [
+            ("one", "find board members", "https://a.example"),
+            ("two", "find legislators", "https://a.example"),
+        ]
 
-        async def scenario(session: AsyncSession) -> tuple[int, int, int]:
-            await import_pages(session, rows)
+        async def scenario(session: AsyncSession) -> tuple[int, int, int, int]:
+            from sqlalchemy import func, select
+
+            async def count(table) -> int:
+                return (
+                    await session.execute(select(func.count()).select_from(table))
+                ).scalar_one()
+
+            await import_candidates(session, rows)
             await session.commit()
-            await import_pages(session, rows)
+            await import_candidates(session, rows)
             await session.commit()
-            counts = (
-                await session.execute(
-                    select(
-                        func.count(select(Page.id).scalar_subquery()),
-                        func.count(select(PageOrganization.id).scalar_subquery()),
-                        func.count(select(PageDataset.id).scalar_subquery()),
-                    )
-                )
-            ).one()
-            return tuple(counts)
+            return (
+                await count(Objective),
+                await count(Url),
+                await count(Candidate),
+                await count(Dataset),
+            )
 
         return asyncio.run(run_with_session(scenario))
 
-    assert run() == (1, 1, 1)
+    assert run() == (2, 1, 2, 2)
 
 
-# --- select_due_pages: real queries against an in-memory async SQLite DB ---
-
-
-def make_page(url: str) -> Page:
-    return Page(id=uuid4(), url=url, created_at=datetime.now(UTC))
-
-
-def make_inspection(page: Page, outcome: Outcome, created_at: datetime) -> Inspection:
-    return Inspection(
-        id=uuid4(),
-        page_id=page.id,
-        snapshot_id=uuid4(),
-        outcome=outcome,
-        model="m",
-        created_at=created_at,
-        captured_at=created_at - timedelta(minutes=1),
-    )
-
-
-@pytest.mark.parametrize(
-    ("outcome", "age", "due"),
-    [
-        (None, None, True),  # never attempted
-        (Outcome.PRODUCTIVE, timedelta(days=30), True),  # productive and old
-        (Outcome.PRODUCTIVE, timedelta(hours=1), False),  # productive and recent
-        (Outcome.EMPTY, timedelta(days=30), False),  # empty verdict sticks
-        (Outcome.BROKEN, timedelta(days=30), False),  # broken verdict sticks
-    ],
-)
-def test_select_due_pages(outcome, age, due):
-    def run() -> list[str]:
-        async def scenario(session: AsyncSession) -> list[str]:
-            page = make_page("https://example.com/a")
-            session.add(page)
-            if outcome is not None:
-                session.add(make_inspection(page, outcome, datetime.now(UTC) - age))
+def test_select_candidates_orders_deterministically():
+    def run() -> list[tuple[str, str, str]]:
+        async def scenario(session: AsyncSession) -> list[tuple[str, str, str]]:
+            await import_candidates(
+                session,
+                [
+                    ("zeta", "last objective", "https://z.example"),
+                    ("alpha", "find board members", "https://m.example"),
+                    ("alpha", "find legislators", "https://a.example"),
+                    ("alpha", "find board members", "https://a.example"),
+                ],
+            )
             await session.commit()
-            due_pages = await select_due_pages(session, timedelta(days=7))
-            return [p.url for p in due_pages]
-
-        return asyncio.run(run_with_session(scenario))
-
-    assert (run() == ["https://example.com/a"]) is due
-
-
-def test_select_due_pages_orders_by_url():
-    def run() -> list[str]:
-        async def scenario(session: AsyncSession) -> list[str]:
-            for url in (
-                "https://example.com/c",
-                "https://example.com/a",
-                "https://example.com/b",
-            ):
-                session.add(Page(id=uuid4(), url=url, created_at=datetime.now(UTC)))
-            await session.commit()
-            due_pages = await select_due_pages(session, timedelta(days=7))
-            return [p.url for p in due_pages]
+            return [
+                (c.objective.dataset.name, c.objective.description, c.url.url)
+                for c in await select_candidates(session)
+            ]
 
         return asyncio.run(run_with_session(scenario))
 
     assert run() == [
-        "https://example.com/a",
-        "https://example.com/b",
-        "https://example.com/c",
+        ("alpha", "find board members", "https://a.example"),
+        ("alpha", "find board members", "https://m.example"),
+        ("alpha", "find legislators", "https://a.example"),
+        ("zeta", "last objective", "https://z.example"),
     ]
 
 
-def test_select_due_pages_uses_latest_inspection():
-    """A recent empty verdict overrides an old productive one: not due."""
+# --- terminal constructors: aggregate construction against a collecting session ---
 
-    def run() -> list[Page]:
-        async def scenario(session: AsyncSession) -> list[Page]:
-            page = make_page("https://example.com/a")
-            session.add(page)
+
+def test_store_broken_attempt_deterministic():
+    session = FakeSession()
+    candidate_id = uuid4()
+    snapshot = make_snapshot()
+
+    attempt = store_broken_attempt(
+        session,
+        candidate_id=candidate_id,
+        snapshot=snapshot,
+        reason="capture failed: net error",
+    )
+
+    assert isinstance(attempt, Attempt)
+    assert session.added == [attempt]
+    assert attempt.candidate_id == candidate_id
+    assert attempt.snapshot_id == snapshot.id
+    assert attempt.captured_at == snapshot.captured_at
+    assert attempt.inspection is None
+
+    assessment = attempt.assessment
+    assert isinstance(assessment, SnapshotAssessment)
+    assert assessment.snapshot_id == snapshot.id
+    assert assessment.status == SnapshotStatus.BROKEN
+    assert assessment.reason == "capture failed: net error"
+    assert assessment.model is None
+    assert assessment.assessed_at is not None
+
+
+def test_store_broken_attempt_model_detected():
+    session = FakeSession()
+
+    attempt = store_broken_attempt(
+        session,
+        candidate_id=uuid4(),
+        snapshot=make_snapshot(),
+        reason="Cloudflare challenge page",
+        model="openai:gpt-test",
+    )
+
+    assert attempt.assessment.model == "openai:gpt-test"
+    assert attempt.assessment.status == SnapshotStatus.BROKEN
+    assert attempt.inspection is None
+
+
+def test_store_broken_attempt_requires_reason():
+    session = FakeSession()
+    with pytest.raises(ValueError):
+        store_broken_attempt(
+            session, candidate_id=uuid4(), snapshot=make_snapshot(), reason="  "
+        )
+    assert session.added == []
+
+
+def test_store_inspection_hit_maps_person_graph():
+    session = FakeSession()
+    candidate_id = uuid4()
+    snapshot = make_snapshot()
+
+    inspection = store_inspection(
+        session,
+        candidate_id=candidate_id,
+        snapshot=snapshot,
+        result=make_hit(),
+        model="openai:gpt-test",
+    )
+
+    assert isinstance(inspection, Inspection)
+    assert session.added == [inspection.attempt]
+    attempt = inspection.attempt
+    assert attempt.candidate_id == candidate_id
+    assert attempt.snapshot_id == snapshot.id
+    assert attempt.captured_at == snapshot.captured_at
+
+    assessment = attempt.assessment
+    assert assessment.status == SnapshotStatus.USABLE
+    assert assessment.reason is None
+    assert assessment.model == "openai:gpt-test"
+
+    assert inspection.outcome == InspectionOutcome.HIT
+    assert inspection.reason is None
+    assert inspection.model == "openai:gpt-test"
+    assert inspection.created_at is not None
+
+    assert [p.name for p in inspection.persons] == ["Jane Doe", "John Roe"]
+    jane = inspection.persons[0]
+    assert jane.countries == ["Utopia"]
+    assert [(pos.name, pos.organization) for pos in jane.positions] == [
+        ("Chair", "Board"),
+        ("Trustee", "Fund"),
+    ]
+    assert all(pos.person is jane for pos in jane.positions)
+
+
+def test_store_inspection_miss_has_reason_and_no_graph():
+    session = FakeSession()
+
+    inspection = store_inspection(
+        session,
+        candidate_id=uuid4(),
+        snapshot=make_snapshot(),
+        result=Miss(reason="page lists press releases only"),
+        model="openai:gpt-test",
+    )
+
+    assert inspection.outcome == InspectionOutcome.MISS
+    assert inspection.reason == "page lists press releases only"
+    assert inspection.persons == []
+    assert inspection.attempt.assessment.status == SnapshotStatus.USABLE
+    assert inspection.attempt.assessment.reason is None
+
+
+def test_store_inspection_requires_model():
+    session = FakeSession()
+    with pytest.raises(ValueError):
+        store_inspection(
+            session,
+            candidate_id=uuid4(),
+            snapshot=make_snapshot(),
+            result=Miss(reason="nothing here"),
+            model=" ",
+        )
+    assert session.added == []
+
+
+def test_store_inspection_rejects_broken_and_unknown_results():
+    session = FakeSession()
+    with pytest.raises(ValueError):
+        store_inspection(
+            session,
+            candidate_id=uuid4(),
+            snapshot=make_snapshot(),
+            result=BrokenSnapshot(reason="challenge page"),
+            model="openai:gpt-test",
+        )
+    with pytest.raises(ValueError):
+        store_inspection(
+            session,
+            candidate_id=uuid4(),
+            snapshot=make_snapshot(),
+            result=object(),  # type: ignore[arg-type]
+            model="openai:gpt-test",
+        )
+    assert session.added == []
+
+
+# --- select_due_candidates: real queries against in-memory async SQLite ---
+
+
+async def add_candidate(
+    session: AsyncSession, dataset: str, objective: str, url: str
+) -> Candidate:
+    await import_candidates(session, [(dataset, objective, url)])
+    await session.flush()
+    stmt = (
+        select(Candidate)
+        .join(Objective, Objective.id == Candidate.objective_id)
+        .join(Dataset, Dataset.id == Objective.dataset_id)
+        .join(Url, Url.id == Candidate.url_id)
+        .where(
+            (Dataset.name == dataset)
+            & (Objective.description == objective)
+            & (Url.url == url)
+        )
+    )
+    return (await session.execute(stmt)).scalar_one()
+
+
+def make_attempt(
+    candidate: Candidate,
+    created_at: datetime,
+    *,
+    outcome: InspectionOutcome | None = None,
+    status: SnapshotStatus = SnapshotStatus.USABLE,
+    attempt_id: UUID | None = None,
+) -> Attempt:
+    snapshot_id = uuid4()
+    attempt = Attempt(
+        id=attempt_id or uuid4(),
+        candidate_id=candidate.id,
+        snapshot_id=snapshot_id,
+        captured_at=created_at - timedelta(minutes=1),
+        created_at=created_at,
+    )
+    attempt.assessment = SnapshotAssessment(
+        snapshot_id=snapshot_id,
+        status=status,
+        reason="unusable" if status is SnapshotStatus.BROKEN else None,
+        model="openai:gpt-test",
+        assessed_at=created_at,
+    )
+    if outcome is not None:
+        attempt.inspection = Inspection(
+            outcome=outcome,
+            reason="miss reason" if outcome is InspectionOutcome.MISS else None,
+            model="openai:gpt-test",
+            created_at=created_at,
+            persons=(
+                [
+                    Person(
+                        name="Jane Doe",
+                        countries=[],
+                        positions=[Position(name="Chair")],
+                    )
+                ]
+                if outcome is InspectionOutcome.HIT
+                else []
+            ),
+        )
+    return attempt
+
+
+@pytest.mark.parametrize(
+    ("verdict", "age", "due"),
+    [
+        (None, None, True),  # never attempted
+        ("hit", timedelta(days=30), True),  # old hit is revisitable
+        ("hit", timedelta(hours=1), False),  # recent hit blocks
+        ("miss", timedelta(days=30), False),  # miss verdict sticks
+        ("broken", timedelta(days=30), False),  # broken blocks normal queue
+    ],
+)
+def test_select_due_candidates_by_latest_verdict(verdict, age, due):
+    def run() -> list[tuple[str, str, str]]:
+        async def scenario(session: AsyncSession) -> list[tuple[str, str, str]]:
+            candidate = await add_candidate(
+                session, "one", "find board members", "https://a.example"
+            )
+            if verdict is not None:
+                match verdict:
+                    case "hit":
+                        outcome, status = (
+                            InspectionOutcome.HIT,
+                            SnapshotStatus.USABLE,
+                        )
+                    case "miss":
+                        outcome, status = (
+                            InspectionOutcome.MISS,
+                            SnapshotStatus.USABLE,
+                        )
+                    case "broken":
+                        outcome, status = (None, SnapshotStatus.BROKEN)
+                session.add(
+                    make_attempt(
+                        candidate,
+                        datetime.now(UTC) - age,
+                        outcome=outcome,
+                        status=status,
+                    )
+                )
+            await session.commit()
+            return [
+                (c.objective.dataset.name, c.objective.description, c.url.url)
+                for c in await select_due_candidates(session, timedelta(days=7))
+            ]
+
+        return asyncio.run(run_with_session(scenario))
+
+    expected = [("one", "find board members", "https://a.example")]
+    assert (run() == expected) is due
+
+
+def test_select_due_candidates_recent_result_supersedes_older_hit():
+    """A recent miss over an old hit makes the candidate not due."""
+
+    def run() -> list[tuple[str, str, str]]:
+        async def scenario(session: AsyncSession) -> list[tuple[str, str, str]]:
+            candidate = await add_candidate(
+                session, "one", "find board members", "https://a.example"
+            )
             session.add(
-                make_inspection(
-                    page, Outcome.PRODUCTIVE, datetime.now(UTC) - timedelta(days=30)
+                make_attempt(
+                    candidate,
+                    datetime.now(UTC) - timedelta(days=30),
+                    outcome=InspectionOutcome.HIT,
                 )
             )
             session.add(
-                make_inspection(
-                    page, Outcome.EMPTY, datetime.now(UTC) - timedelta(days=1)
+                make_attempt(
+                    candidate,
+                    datetime.now(UTC) - timedelta(days=1),
+                    outcome=InspectionOutcome.MISS,
                 )
             )
             await session.commit()
-            return await select_due_pages(session, timedelta(days=7))
+            return [
+                (c.objective.dataset.name, c.objective.description, c.url.url)
+                for c in await select_due_candidates(session, timedelta(days=7))
+            ]
 
+        return asyncio.run(run_with_session(scenario))
+
+    assert run() == []
+
+
+def test_select_due_candidates_orders_deterministically():
+    def run() -> list[str]:
+        async def scenario(session: AsyncSession) -> list[str]:
+            await import_candidates(
+                session,
+                [
+                    ("two", "find legislators", "https://a.example"),
+                    ("one", "find legislators", "https://b.example"),
+                    ("one", "find board members", "https://c.example"),
+                ],
+            )
+            await session.commit()
+            return [
+                c.url.url
+                for c in await select_due_candidates(session, timedelta(days=7))
+            ]
+
+        return asyncio.run(run_with_session(scenario))
+
+    # Dataset name, then objective description, then url.
+    assert run() == ["https://c.example", "https://b.example", "https://a.example"]
+
+
+def test_select_due_candidates_breaks_created_at_ties_by_attempt_id():
+    """Equal created_at: the greater attempt id is the latest verdict."""
+
+    def run() -> list[str]:
+        async def scenario(session: AsyncSession) -> list[str]:
+            candidate = await add_candidate(
+                session, "one", "find board members", "https://a.example"
+            )
+            tie = datetime.now(UTC) - timedelta(days=30)
+            low, high = uuid4(), uuid4()
+            if low > high:
+                low, high = high, low
+            session.add(
+                make_attempt(
+                    candidate, tie, attempt_id=high, outcome=InspectionOutcome.MISS
+                )
+            )
+            session.add(
+                make_attempt(
+                    candidate, tie, attempt_id=low, outcome=InspectionOutcome.HIT
+                )
+            )
+            await session.commit()
+            return [
+                c.url.url
+                for c in await select_due_candidates(session, timedelta(days=7))
+            ]
+
+        # The miss (greater id) is the latest attempt: not due.
         return asyncio.run(run_with_session(scenario))
 
     assert run() == []
