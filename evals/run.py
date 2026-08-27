@@ -1,4 +1,4 @@
-"""Run the extraction eval suite against frozen HTML fixtures.
+"""Run the inspection eval suite against frozen HTML fixtures.
 
 Datasets live in datasets/ as YAML (validated against the generated
 *_schema.json); fixtures are fictional pages structurally equivalent to real
@@ -43,7 +43,7 @@ def main() -> int:
         args.dataset, custom_evaluator_types=CUSTOM_EVALUATOR_TYPES
     )
     report = dataset.evaluate_sync(
-        partial(extract, model=model), name=f"extraction:{model}", progress=False
+        partial(extract, model=model), name=f"inspection:{model}", progress=False
     )
     report.print(include_input=True, include_output=True, include_durations=True)
 

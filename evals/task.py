@@ -42,5 +42,7 @@ async def extract(inputs: FixtureInput, model: str) -> PageResult:
         resource_media_types=har_resource_media_types(har),
     )
     agent = build_extraction_agent(model)
-    result = await agent.run(build_prompt(metadata, outline), deps=deps)
+    result = await agent.run(
+        build_prompt(inputs.objective, metadata, outline), deps=deps
+    )
     return result.output

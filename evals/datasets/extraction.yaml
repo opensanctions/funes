@@ -1,264 +1,517 @@
 # yaml-language-server: $schema=extraction_schema.json
-name: extraction
+name: inspection
 cases:
 - name: office_of_the_sg
   inputs:
     fixture: office_of_the_sg
     url: https://www.caf.example.org/about/office-of-the-sg
+    objective: Identify the leadership of the CAF Office of the Secretary-General.
+  metadata: null
   expected_output:
-    kind: extraction
+    kind: hit
     persons:
     - name: Mirela Voss
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Secretary-General
         organization: CAF
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
     - name: Tomas Lindqvist
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Chef de Cabinet
         organization: CAF
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
+  evaluators: []
 - name: roster_table
   inputs:
     fixture: roster_table
     url: https://www.lbc.example.org/governance/delegates
+    objective: Identify the delegates and alternates sitting on the Lakes Basin Commission
+      Council.
+  metadata: null
   expected_output:
-    kind: extraction
+    kind: hit
     persons:
     - name: Ms. Ingrid Halloway
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Delegate
         organization: Lakes Basin Commission Council
+        description: null
         jurisdiction: Bellanor, Ferndale, Harwick
         start_date: Mar, 2024
+        end_date: null
     - name: Mr. Peter Oskanson
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Alternate
         organization: Lakes Basin Commission Council
+        description: null
         jurisdiction: Bellanor, Ferndale, Harwick
         start_date: Mar, 2024
+        end_date: null
     - name: Dr. Marta Velling
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Delegate
         organization: Lakes Basin Commission Council
+        description: null
         jurisdiction: Caldera Isles, Pinehaven, Stonebrook
         start_date: Jun, 2025
+        end_date: null
     - name: Mrs. Rosa Delacampra
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Alternate
         organization: Lakes Basin Commission Council
+        description: null
         jurisdiction: Caldera Isles, Pinehaven, Stonebrook
         start_date: Jun, 2025
+        end_date: null
     - name: Mr. Anders Quill
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Delegate
         organization: Lakes Basin Commission Council
+        description: null
         jurisdiction: Thornwick
         start_date: Jan, 2026
+        end_date: null
+  evaluators: []
 - name: bot_challenge
   inputs:
     fixture: bot_challenge
     url: https://www.nw-tribunal.example.org/secretariat/council
+    objective: Identify the judges and officeholders of the Northwest Tribunal's secretariat
+      council.
+  metadata: null
   expected_output:
+    reason: Bot-detection security challenge interstitial ("Just a moment...", "verifies
+      you are not a bot"); no usable source content.
     kind: broken
-    reason: Bot-detection security challenge interstitial ("Just a moment...", "verifies you are not a bot"); no usable source content.
+  evaluators: []
 - name: elections_no_holders
   inputs:
     fixture: elections_no_holders
     url: https://www.aia.example.org/elecciones
+    objective: Identify the members of the Asamblea del Istmo Austral's 2027-2028
+      Mesa Directiva.
+  metadata: null
   expected_output:
-    kind: extraction
+    reason: The page announces the 2027-2028 Mesa Directiva election process (call,
+      calendar, electoral roll, candidacy deadlines) but names no board members or
+      other position holders.
+    kind: miss
+  evaluators: []
 - name: nav_menu_hallucination
   inputs:
     fixture: nav_menu_hallucination
     url: https://www.maresia.example.org/o-compacto/organizacao
+    objective: Identify the heads of the Maresia Compact Secretariat's departments
+      and organizational units.
+  metadata: null
   expected_output:
-    kind: extraction
+    reason: The page is a navigation menu plus a mission description; it lists curators
+      and executive members by name under nav headings but names no department heads
+      or unit leadership.
+    kind: miss
+  evaluators: []
 - name: conjoined_role_misattribution
   inputs:
     fixture: conjoined_role_misattribution
     url: https://www.vu.example.org/en/chairperson
+    objective: Identify the Chairpersons of the Veltrane Union.
+  metadata: null
   expected_output:
-    kind: extraction
+    kind: hit
     persons:
     - name: Adama Kessi
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Chairperson of the Veltrane Union
         organization: Veltrane Union
-    - name: Boris Tavernier
-      positions:
-      - name: President of the Republic of Kestria
-        jurisdiction: Republic of Kestria
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
     - name: Omar Nasri
+      dob: null
+      bio: null
+      countries: []
       positions:
-      - name: President of the Republic of Dahab
-        jurisdiction: Republic of Dahab
       - name: Chairperson of the Veltrane Union
         organization: Veltrane Union
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
     - name: Lucas Marek
+      dob: null
+      bio: null
+      countries: []
       positions:
-      - name: Prime Minister of the Republic of Ostrava
-        jurisdiction: Republic of Ostrava
       - name: Chairperson of the Veltrane Union
         organization: Veltrane Union
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
+  evaluators: []
 - name: board_member_cards
   inputs:
     fixture: board_member_cards
     url: https://www.meridian.example.org/board
+    objective: Identify the members of the Meridian Accord board, including the board
+      chair and alternates.
+  metadata: null
   expected_output:
-    kind: extraction
+    kind: hit
     persons:
     - name: Dr. Ibembe Orlu
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Board member
         organization: Meridian Accord
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
       - name: Chair of the Board
         organization: Meridian Accord
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
     - name: Tomas Ferreira Lopes
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Board member
         organization: Meridian Accord
+        description: null
         jurisdiction: Northern Region
-      - name: National Coordinator, Zarvia Multi-Stakeholder Group
-        organization: Zarvia Multi-Stakeholder Group
+        start_date: null
+        end_date: null
     - name: Nadia Solheim
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Board member alternate
         organization: Meridian Accord
+        description: null
         jurisdiction: Northern Region
-      - name: Deputy Minister of Environment, Republic of Halvard
-        jurisdiction: Republic of Halvard
+        start_date: null
+        end_date: null
     - name: Peter Anand Mukherjee
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Board member
         organization: Meridian Accord
+        description: null
         jurisdiction: Southern Region
-      - name: Head of Extractives Practice, Corvin Policy Institute
-        organization: Corvin Policy Institute
+        start_date: null
+        end_date: null
     - name: Ingrid Dahl
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Board member
         organization: Meridian Accord
+        description: null
         jurisdiction: Southern Region
+        start_date: null
+        end_date: null
+  evaluators: []
 - name: parenthetical_home_authority
   inputs:
     fixture: parenthetical_home_authority
     url: https://www.cisa.example.org/governance/leadership
+    objective: Identify the chairs and vice chairs of the Corvara Insurance Supervisors
+      Alliance's executive, audit, budget, and standards committees.
+  metadata: null
   expected_output:
-    kind: extraction
+    kind: hit
     persons:
     - name: Aksel Brandvold
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Chair, Executive Committee (Norlandia)
         organization: Corvara Insurance Supervisors Alliance
+        description: null
         jurisdiction: Norlandia
+        start_date: null
+        end_date: null
     - name: Miriam Osei-Trekker
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Vice Chair, Executive Committee (Valmont Margin Authority)
         organization: Corvara Insurance Supervisors Alliance
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
     - name: Hugo Delacroix-Ferre
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Vice Chair, Executive Committee (Taldoria)
         organization: Corvara Insurance Supervisors Alliance
+        description: null
         jurisdiction: Taldoria
+        start_date: null
+        end_date: null
     - name: Yuki Marchetti
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Chair, Audit Committee (Verucia)
         organization: Corvara Insurance Supervisors Alliance
+        description: null
         jurisdiction: Verucia
+        start_date: null
+        end_date: null
     - name: Priscilla Odum
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Chair, Budget Committee (Petricor Insurance Regulatory Board)
         organization: Corvara Insurance Supervisors Alliance
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
     - name: Jonas Mbeki-Strand
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Chair, Standards Committee (Zephyria)
         organization: Corvara Insurance Supervisors Alliance
+        description: null
         jurisdiction: Zephyria
+        start_date: null
+        end_date: null
+  evaluators: []
 - name: cross_roster_duplicate
   inputs:
     fixture: cross_roster_duplicate
     url: https://www.viat.example.org/chambers
+    objective: Identify the judges, including reserve judges, of the Velandra International
+      Arbitration Tribunal's First Chamber.
+  metadata: null
   expected_output:
-    kind: extraction
+    kind: hit
     persons:
     - name: Justice Aurelio Brandt
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Judge of the First Chamber
         organization: Velandra International Arbitration Tribunal
+        description: null
+        jurisdiction: null
         start_date: '2021'
         end_date: '2025'
       - name: Reserve Judge of the First Chamber
         organization: Velandra International Arbitration Tribunal
+        description: null
+        jurisdiction: null
         start_date: '2026'
+        end_date: null
     - name: Justice Irmgard Havel
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Judge of the First Chamber
         organization: Velandra International Arbitration Tribunal
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
     - name: Justice Tomas Reyes Ocampo
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Reserve Judge of the First Chamber
         organization: Velandra International Arbitration Tribunal
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
+  evaluators: []
 - name: nationality_vs_origin
   inputs:
     fixture: nationality_vs_origin
     url: https://www.helixconsortium.example.org/our-team
+    objective: Identify the members of the Helix Consortium team.
+  metadata: null
   expected_output:
-    kind: extraction
+    kind: hit
     persons:
     - name: Dr. Amara Nkemdirim
+      dob: null
+      bio: null
+      countries:
+      - Kelmora
       positions:
       - name: Executive officer
         organization: Helix Consortium
-      countries:
-      - Kelmora
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
     - name: Petar Novakovic
-      positions:
-      - name: Communications officer
-        organization: Helix Consortium
+      dob: null
+      bio: null
       countries:
       - Solvaria
       - Meridia
-    - name: Marina Delgado
-      positions:
-      - name: Partnerships officer
-        organization: Helix Consortium
-        start_date: '2019'
-    - name: Maxime Perrault
       positions:
       - name: Communications officer
         organization: Helix Consortium
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
+    - name: Marina Delgado
+      dob: null
+      bio: null
+      countries: []
+      positions:
+      - name: Partnerships officer
+        organization: Helix Consortium
+        description: null
+        jurisdiction: null
+        start_date: '2019'
+        end_date: null
+    - name: Maxime Perrault
+      dob: null
+      bio: null
+      countries: []
+      positions:
+      - name: Communications officer
+        organization: Helix Consortium
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
     - name: Judith Palmer
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Resource mobilization manager
         organization: Helix Consortium
+        description: null
+        jurisdiction: null
         start_date: '2021'
+        end_date: null
+  evaluators: []
 - name: collective_role_label
   inputs:
     fixture: collective_role_label
     url: https://www.harborlight.example.org/partners/representatives
+    objective: Identify the heads and named representatives of Harborlight's partner
+      organizations.
+  metadata: null
   expected_output:
-    kind: extraction
+    kind: hit
     persons:
     - name: Njeri Kamau
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Director
         organization: Uzima Health Initiative
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
     - name: Aarav Deshpande
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Trustee
         organization: Setu Foundation for Children
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
     - name: Ingrid Halvorsen
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Executive Director
+        organization: null
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
+  evaluators: []
 - name: image_only_staff
   inputs:
     fixture: image_only_staff
     url: https://www.caldris.example.org/about/staff-directory
+    objective: Identify the department heads of the Caldris Energy Forum.
+  metadata: null
   expected_output:
-    kind: extraction
+    kind: hit
     persons:
     - name: Dr Leona Marwick
+      dob: null
+      bio: null
+      countries: []
       positions:
       - name: Policy Coordination Department Head
         organization: Caldris Energy Forum
+        description: null
+        jurisdiction: null
+        start_date: null
+        end_date: null
+  evaluators: []
 evaluators:
-- ExtractionF1
+- InspectionF1
+report_evaluators: []

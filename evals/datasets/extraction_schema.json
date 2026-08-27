@@ -1,25 +1,25 @@
 {
   "$defs": {
-    "BrokenPage": {
-      "description": "Result for a page that cannot be used as an extraction source.",
+    "BrokenSnapshot": {
+      "description": "Result for a Pravda snapshot that cannot be used as a source.",
       "properties": {
+        "reason": {
+          "description": "Why the snapshot is unusable.",
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
         "kind": {
           "const": "broken",
           "default": "broken",
           "title": "Kind",
-          "type": "string"
-        },
-        "reason": {
-          "description": "Why the page is unusable.",
-          "minLength": 1,
-          "title": "Reason",
           "type": "string"
         }
       },
       "required": [
         "reason"
       ],
-      "title": "BrokenPage",
+      "title": "BrokenSnapshot",
       "type": "object"
     },
     "Case": {
@@ -50,17 +50,21 @@
             {
               "discriminator": {
                 "mapping": {
-                  "broken": "#/$defs/BrokenPage",
-                  "extraction": "#/$defs/Extraction"
+                  "broken": "#/$defs/BrokenSnapshot",
+                  "hit": "#/$defs/Hit",
+                  "miss": "#/$defs/Miss"
                 },
                 "propertyName": "kind"
               },
               "oneOf": [
                 {
-                  "$ref": "#/$defs/Extraction"
+                  "$ref": "#/$defs/Hit"
                 },
                 {
-                  "$ref": "#/$defs/BrokenPage"
+                  "$ref": "#/$defs/Miss"
+                },
+                {
+                  "$ref": "#/$defs/BrokenSnapshot"
                 }
               ]
             },
@@ -76,7 +80,7 @@
           "items": {
             "anyOf": [
               {
-                "const": "ExtractionF1",
+                "const": "InspectionF1",
                 "type": "string"
               },
               {
@@ -161,28 +165,8 @@
       "title": "Case",
       "type": "object"
     },
-    "Extraction": {
-      "properties": {
-        "kind": {
-          "const": "extraction",
-          "default": "extraction",
-          "title": "Kind",
-          "type": "string"
-        },
-        "persons": {
-          "description": "Position holders stated on the page. Empty list if none.",
-          "items": {
-            "$ref": "#/$defs/Person"
-          },
-          "title": "Persons",
-          "type": "array"
-        }
-      },
-      "title": "Extraction",
-      "type": "object"
-    },
     "FixtureInput": {
-      "description": "One frozen page: the fixture file stem and its fictional final URL.",
+      "description": "One frozen page: the fixture file stem, its fictional final URL, and\nthe objective the inspection runs against.",
       "properties": {
         "fixture": {
           "title": "Fixture",
@@ -191,13 +175,45 @@
         "url": {
           "title": "Url",
           "type": "string"
+        },
+        "objective": {
+          "description": "What the requester wants to learn from the page.",
+          "minLength": 1,
+          "title": "Objective",
+          "type": "string"
         }
       },
       "required": [
         "fixture",
-        "url"
+        "url",
+        "objective"
       ],
       "title": "FixtureInput",
+      "type": "object"
+    },
+    "Hit": {
+      "description": "The snapshot satisfies the objective: at least one person-position\nrelationship relevant to it.",
+      "properties": {
+        "kind": {
+          "const": "hit",
+          "default": "hit",
+          "title": "Kind",
+          "type": "string"
+        },
+        "persons": {
+          "description": "Person-position relationships on the page that are relevant to the objective. A hit always contains at least one person.",
+          "items": {
+            "$ref": "#/$defs/Person"
+          },
+          "minItems": 1,
+          "title": "Persons",
+          "type": "array"
+        }
+      },
+      "required": [
+        "persons"
+      ],
+      "title": "Hit",
       "type": "object"
     },
     "KnownModelName": {
@@ -881,6 +897,28 @@
         "zai:glm-5v-turbo"
       ],
       "type": "string"
+    },
+    "Miss": {
+      "description": "Usable snapshot that contains nothing satisfying the objective.",
+      "properties": {
+        "reason": {
+          "description": "What the page does contain and why it falls short of the objective.",
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "kind": {
+          "const": "miss",
+          "default": "miss",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "title": "Miss",
+      "type": "object"
     },
     "ModelSettings": {
       "additionalProperties": false,
@@ -2353,7 +2391,7 @@
       "items": {
         "anyOf": [
           {
-            "const": "ExtractionF1",
+            "const": "InspectionF1",
             "type": "string"
           },
           {

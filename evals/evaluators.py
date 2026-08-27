@@ -1,4 +1,4 @@
-"""Custom evaluators for the extraction eval suite.
+"""Custom evaluators for the inspection eval suite.
 
 Classes referenced from dataset YAML must also be listed in
 CUSTOM_EVALUATOR_TYPES and passed to both ``Dataset.from_file`` and
@@ -11,7 +11,7 @@ from typing import Any
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext
 
 from evals.models import FixtureInput
-from funes.extract import BrokenPage, Extraction, PageResult, Person, Position
+from funes.extract import BrokenSnapshot, Hit, Miss, PageResult, Person, Position
 
 
 def _norm(value: str) -> str:
@@ -22,19 +22,17 @@ def _norm_optional(value: str | None) -> str | None:
     return None if value is None else _norm(value)
 
 
-def _persons(extraction: Extraction) -> dict[str, Person]:
-    return {_norm(p.name): p for p in extraction.persons}
+def _persons(hit: Hit) -> dict[str, Person]:
+    return {_norm(p.name): p for p in hit.persons}
 
 
 def _positions(person: Person) -> dict[str, Position]:
     return {_norm(pos.name): pos for pos in person.positions}
 
 
-def _pairs(extraction: Extraction) -> set[tuple[str, str]]:
+def _pairs(hit: Hit) -> set[tuple[str, str]]:
     return {
-        (_norm(p.name), _norm(pos.name))
-        for p in extraction.persons
-        for pos in p.positions
+        (_norm(p.name), _norm(pos.name)) for p in hit.persons for pos in p.positions
     }
 
 
@@ -81,48 +79,68 @@ def _countries_accuracy(
     return agree / len(matched)
 
 
-@dataclass
-class ExtractionF1(Evaluator[FixtureInput, PageResult]):
-    """Score an extraction against ground truth, structurally then per field.
+def _zero_scores() -> dict[str, float]:
+    return {
+        "person_f1": 0.0,
+        "person_position_f1": 0.0,
+        "organization_accuracy": 0.0,
+        "jurisdiction_accuracy": 0.0,
+        "start_date_accuracy": 0.0,
+        "end_date_accuracy": 0.0,
+        "countries_accuracy": 0.0,
+    }
 
-    Assertions: exact normalized person set (``persons_match``), or, for a
-    ``BrokenPage`` expectation, that the output is broken with a stated reason
-    (``broken_match``). Scores: person F1, person-position pair F1, and — over
-    persons and positions matched by normalized name — per-field accuracy for
-    organization, jurisdiction, start_date, end_date, and countries. Field
-    scores are informational, never assertions: a debatable label should show
-    up as a sub-1.0 score, not a failed suite.
+
+@dataclass
+class InspectionF1(Evaluator[FixtureInput, PageResult]):
+    """Score an inspection result against ground truth, structurally then per
+    field.
+
+    Assertions: a ``BrokenSnapshot`` expectation requires a broken output with
+    a stated reason (``broken_match``); a ``Miss`` expectation requires a miss
+    output with a stated reason (``miss_match``); a ``Hit`` expectation asserts
+    the exact normalized person set (``persons_match``). Scores: person F1,
+    person-position pair F1, and — over persons and positions matched by
+    normalized name — per-field accuracy for organization, jurisdiction,
+    start_date, end_date, and countries. Non-hit outputs score zero on every
+    graph score. Field scores are informational, never assertions: a debatable
+    label should show up as a sub-1.0 score, not a failed suite.
     """
 
     def evaluate(
         self, ctx: EvaluatorContext[FixtureInput, PageResult]
     ) -> dict[str, EvaluationReason | float]:
         expected = ctx.expected_output
-        if isinstance(expected, BrokenPage):
+        if isinstance(expected, BrokenSnapshot):
             return {
                 "broken_match": EvaluationReason(
-                    isinstance(ctx.output, BrokenPage)
+                    isinstance(ctx.output, BrokenSnapshot)
                     and bool(ctx.output.reason.strip()),
                     reason=(
                         f"output is {ctx.output.kind!r}, expected broken"
-                        if not isinstance(ctx.output, BrokenPage)
+                        if not isinstance(ctx.output, BrokenSnapshot)
                         else "reason stated"
                     ),
                 )
             }
-        assert isinstance(expected, Extraction)
-        if not isinstance(ctx.output, Extraction):
+        if isinstance(expected, Miss):
+            return {
+                "miss_match": EvaluationReason(
+                    isinstance(ctx.output, Miss) and bool(ctx.output.reason.strip()),
+                    reason=(
+                        f"output is {ctx.output.kind!r}, expected miss"
+                        if not isinstance(ctx.output, Miss)
+                        else "reason stated"
+                    ),
+                )
+            }
+        assert isinstance(expected, Hit)
+        if not isinstance(ctx.output, Hit):
             return {
                 "persons_match": EvaluationReason(
-                    False, reason=f"output is {ctx.output.kind!r}, not an extraction"
+                    False, reason=f"output is {ctx.output.kind!r}, not a hit"
                 ),
-                "person_f1": 0.0,
-                "person_position_f1": 0.0,
-                "organization_accuracy": 0.0,
-                "jurisdiction_accuracy": 0.0,
-                "start_date_accuracy": 0.0,
-                "end_date_accuracy": 0.0,
-                "countries_accuracy": 0.0,
+                **_zero_scores(),
             }
         expected_persons = _persons(expected)
         actual_persons = _persons(ctx.output)
@@ -166,4 +184,4 @@ class ExtractionF1(Evaluator[FixtureInput, PageResult]):
         }
 
 
-CUSTOM_EVALUATOR_TYPES = [ExtractionF1]
+CUSTOM_EVALUATOR_TYPES = [InspectionF1]
