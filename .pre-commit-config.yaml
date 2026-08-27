@@ -10,6 +10,13 @@ repos:
         stages: [post-checkout]
         always_run: true
         pass_filenames: false
+      - id: env-from-example
+        name: create .env from .env.example
+        entry: bash -c 'test -f .env || cp .env.example .env'
+        language: system
+        stages: [post-checkout]
+        always_run: true
+        pass_filenames: false
       - id: ruff-check
         name: ruff lint
         entry: uv run ruff check --fix
