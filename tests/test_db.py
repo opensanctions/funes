@@ -193,7 +193,6 @@ def test_store_broken_attempt_deterministic():
     assert assessment.status == SnapshotStatus.BROKEN
     assert assessment.reason == "capture failed: net error"
     assert assessment.model is None
-    assert assessment.assessed_at is not None
 
 
 def test_store_broken_attempt_model_detected():
@@ -249,6 +248,10 @@ def test_stored_aggregates_navigate_from_assessment_to_candidate():
                 loaded.attempt.candidate.url.url,
                 loaded.attempt.candidate.objective.description,
                 loaded.reason or "",
+                loaded.status,
+                loaded.attempt.created_at is not None
+                and loaded.assessed_at is not None
+                and "server defaults",
             )
 
         return asyncio.run(run_with_session(scenario))
@@ -258,6 +261,8 @@ def test_stored_aggregates_navigate_from_assessment_to_candidate():
         "https://a.example",
         "find board members",
         "Cloudflare challenge",
+        SnapshotStatus.BROKEN,
+        "server defaults",
     )
 
 
@@ -292,7 +297,6 @@ def test_store_inspection_hit_maps_person_graph():
     assert inspection.outcome == InspectionOutcome.HIT
     assert inspection.reason is None
     assert inspection.model == "openai:gpt-test"
-    assert inspection.created_at is not None
 
     assert [p.name for p in inspection.persons] == ["Jane Doe", "John Roe"]
     jane = inspection.persons[0]

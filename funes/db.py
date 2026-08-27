@@ -3,6 +3,7 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
+from typing import Any, ClassVar
 
 from pravda import Snapshot
 from sqlalchemy import (
@@ -54,12 +55,8 @@ class InspectionOutcome(StrEnum):
     MISS = "miss"
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 class Base(DeclarativeBase):
-    pass
+    type_annotation_map: ClassVar[dict[type[Any], Any]] = {str: Text}
 
 
 class Dataset(Base):
@@ -68,8 +65,10 @@ class Dataset(Base):
     __tablename__ = "dataset"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = mapped_column(Text, unique=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    name: Mapped[str] = mapped_column(unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     objectives: Mapped[list["Objective"]] = relationship(
         back_populates="dataset", cascade="all, delete-orphan"
@@ -86,8 +85,10 @@ class Objective(Base):
     dataset_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("dataset.id", ondelete="CASCADE")
     )
-    description: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    description: Mapped[str] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     dataset: Mapped[Dataset] = relationship(back_populates="objectives")
     candidates: Mapped[list["Candidate"]] = relationship(
@@ -101,8 +102,10 @@ class Url(Base):
     __tablename__ = "url"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    url: Mapped[str] = mapped_column(Text, unique=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    url: Mapped[str] = mapped_column(unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     candidates: Mapped[list["Candidate"]] = relationship(
         back_populates="url", cascade="all, delete-orphan"
@@ -120,7 +123,9 @@ class Candidate(Base):
         ForeignKey("objective.id", ondelete="CASCADE")
     )
     url_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("url.id", ondelete="CASCADE"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     objective: Mapped[Objective] = relationship(back_populates="candidates")
     url: Mapped[Url] = relationship(back_populates="candidates")
@@ -147,7 +152,9 @@ class Attempt(Base):
     )
     snapshot_id: Mapped[uuid.UUID] = mapped_column(unique=True)
     captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     candidate: Mapped[Candidate] = relationship(back_populates="attempts")
     assessment: Mapped["SnapshotAssessment | None"] = relationship(
@@ -166,10 +173,12 @@ class SnapshotAssessment(Base):
     snapshot_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("attempt.snapshot_id", ondelete="CASCADE"), primary_key=True
     )
-    status: Mapped[str] = mapped_column(Text)
-    reason: Mapped[str | None] = mapped_column(Text)
-    model: Mapped[str | None] = mapped_column(Text)
-    assessed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    status: Mapped[SnapshotStatus]
+    reason: Mapped[str | None] = mapped_column()
+    model: Mapped[str | None] = mapped_column()
+    assessed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     attempt: Mapped[Attempt] = relationship(back_populates="assessment", uselist=False)
 
@@ -183,10 +192,12 @@ class Inspection(Base):
     attempt_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("attempt.id", ondelete="CASCADE"), unique=True
     )
-    outcome: Mapped[str] = mapped_column(Text)
-    reason: Mapped[str | None] = mapped_column(Text)
-    model: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    outcome: Mapped[InspectionOutcome]
+    reason: Mapped[str | None] = mapped_column()
+    model: Mapped[str] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     attempt: Mapped[Attempt] = relationship(back_populates="inspection")
     persons: Mapped[list["Person"]] = relationship(
@@ -203,9 +214,9 @@ class Person(Base):
     inspection_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("inspection.id", ondelete="CASCADE")
     )
-    name: Mapped[str] = mapped_column(Text)
-    dob: Mapped[str | None] = mapped_column(Text)
-    bio: Mapped[str | None] = mapped_column(Text)
+    name: Mapped[str] = mapped_column()
+    dob: Mapped[str | None] = mapped_column()
+    bio: Mapped[str | None] = mapped_column()
     countries: Mapped[list[str]] = mapped_column(JSON)
 
     inspection: Mapped[Inspection] = relationship(back_populates="persons")
@@ -223,12 +234,12 @@ class Position(Base):
     person_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("person.id", ondelete="CASCADE")
     )
-    name: Mapped[str] = mapped_column(Text)
-    organization: Mapped[str | None] = mapped_column(Text)
-    description: Mapped[str | None] = mapped_column(Text)
-    jurisdiction: Mapped[str | None] = mapped_column(Text)
-    start_date: Mapped[str | None] = mapped_column(Text)
-    end_date: Mapped[str | None] = mapped_column(Text)
+    name: Mapped[str] = mapped_column()
+    organization: Mapped[str | None] = mapped_column()
+    description: Mapped[str | None] = mapped_column()
+    jurisdiction: Mapped[str | None] = mapped_column()
+    start_date: Mapped[str | None] = mapped_column()
+    end_date: Mapped[str | None] = mapped_column()
 
     person: Mapped[Person] = relationship(back_populates="positions")
 
@@ -361,7 +372,7 @@ async def select_due_candidates(
         .where(ranked.c.rank == 1)
         .subquery()
     )
-    cutoff = _now() - revisit_interval
+    cutoff = datetime.now(UTC) - revisit_interval
     stmt = (
         select(Candidate)
         .options(
@@ -406,20 +417,17 @@ def store_broken_attempt(
     from inspectability checks or a validated BrokenSnapshot; ``model``
     is set only when the model itself concluded the snapshot is broken.
     """
-    now = _now()
     attempt = Attempt(
         id=attempt_id,
         candidate_id=candidate_id,
         snapshot_id=snapshot.id,
         captured_at=snapshot.captured_at,
-        created_at=now,
     )
     attempt.assessment = SnapshotAssessment(
         snapshot_id=snapshot.id,
         status=SnapshotStatus.BROKEN,
         reason=reason,
         model=model,
-        assessed_at=now,
     )
     session.add(attempt)
     return attempt
@@ -441,7 +449,6 @@ def store_inspection(
     person/position graph and must not carry a reason; a Miss carries its
     reason and no people. ``model`` is required.
     """
-    now = _now()
     if isinstance(result, Hit):
         outcome = InspectionOutcome.HIT
         reason = None
@@ -474,21 +481,18 @@ def store_inspection(
         candidate_id=candidate_id,
         snapshot_id=snapshot.id,
         captured_at=snapshot.captured_at,
-        created_at=now,
     )
     attempt.assessment = SnapshotAssessment(
         snapshot_id=snapshot.id,
         status=SnapshotStatus.USABLE,
         reason=None,
         model=model,
-        assessed_at=now,
     )
     inspection = Inspection(
         attempt=attempt,
         outcome=outcome,
         reason=reason,
         model=model,
-        created_at=now,
         persons=persons,
     )
     session.add(attempt)

@@ -21,7 +21,12 @@ def upgrade() -> None:
         "dataset",
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("name", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
     )
@@ -30,7 +35,12 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("dataset_id", sa.Uuid(), nullable=False),
         sa.Column("description", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["dataset_id"], ["dataset.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("dataset_id", "description"),
@@ -39,7 +49,12 @@ def upgrade() -> None:
         "url",
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("url", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("url"),
     )
@@ -48,7 +63,12 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("objective_id", sa.Uuid(), nullable=False),
         sa.Column("url_id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["objective_id"], ["objective.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["url_id"], ["url.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -60,7 +80,12 @@ def upgrade() -> None:
         sa.Column("candidate_id", sa.Uuid(), nullable=False),
         sa.Column("snapshot_id", sa.Uuid(), nullable=False),
         sa.Column("captured_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["candidate_id"], ["candidate.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("snapshot_id"),
@@ -71,10 +96,17 @@ def upgrade() -> None:
     op.create_table(
         "snapshot_assessment",
         sa.Column("snapshot_id", sa.Uuid(), nullable=False),
-        sa.Column("status", sa.Text(), nullable=False),
+        sa.Column(
+            "status", sa.Enum("USABLE", "BROKEN", name="snapshotstatus"), nullable=False
+        ),
         sa.Column("reason", sa.Text(), nullable=True),
         sa.Column("model", sa.Text(), nullable=True),
-        sa.Column("assessed_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column(
+            "assessed_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(
             ["snapshot_id"], ["attempt.snapshot_id"], ondelete="CASCADE"
         ),
@@ -84,10 +116,17 @@ def upgrade() -> None:
         "inspection",
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("attempt_id", sa.Uuid(), nullable=False),
-        sa.Column("outcome", sa.Text(), nullable=False),
+        sa.Column(
+            "outcome", sa.Enum("HIT", "MISS", name="inspectionoutcome"), nullable=False
+        ),
         sa.Column("reason", sa.Text(), nullable=True),
         sa.Column("model", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["attempt_id"], ["attempt.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("attempt_id"),
