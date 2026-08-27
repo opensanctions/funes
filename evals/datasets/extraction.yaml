@@ -249,5 +249,16 @@ cases:
     - name: Ingrid Halvorsen
       positions:
       - name: Executive Director
+- name: image_only_staff
+  inputs:
+    fixture: image_only_staff
+    url: https://www.caldris.example.org/about/staff-directory
+  expected_output:
+    kind: extraction
+    persons:
+    - name: Dr Leona Marwick
+      positions:
+      - name: Policy Coordination Department Head
+        organization: Caldris Energy Forum
 evaluators:
 - ExtractionF1
