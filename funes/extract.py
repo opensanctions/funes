@@ -163,24 +163,43 @@ the reason for an honour is not a responsibility of its holder.
 
 First decide whether the snapshot is usable as a source at all. If it is
 unusable, do not evaluate the objective and do not extract. Instead mark the
-snapshot broken with kind="broken" and a short reason. The snapshot is an
-immutable capture of the page; brokenness is about that capture, not about
-whether the page satisfies the objective. Mark a snapshot broken only for:
+snapshot broken with kind="broken" and a short reason naming what blocks the
+content — this guides the repair attempt. The snapshot is an immutable
+capture of the page; brokenness is about that capture, not about whether the
+page satisfies the objective. Broken means the page's content was not
+captured, but a fresh capture — more patient, or one that clicks through
+interstitials — may reveal it. Mark a snapshot broken for:
 
 - Cloudflare or other bot-detection challenges ("Checking your browser",
-  "Verify you are human", similar interstitials).
-- HTTP or server errors (5xx, gateway timeouts) and 404 or otherwise
-  missing pages, including parked domains.
-- Login walls, paywalls, or cookie-consent gates with no usable public
-  content behind them.
-- Blank shells: pages with no meaningful text or metadata.
+  "Verify you are human", similar interstitials): a fresh capture may pass.
+- Cookie-consent walls, "accept terms" gates, modal overlays, and similar
+  click-through interstitials that block the content: a capture that clicks
+  them may reveal the page.
+- Server errors (5xx, gateway timeouts) with no meaningful page content:
+  the failure may be transient.
+- Blank shells: pages with no meaningful text or metadata, and truncated or
+  garbled renders.
 - Pages whose final outline is unrelated to the requested URL because of an
-  unexpected redirect.
+  unexpected redirect, unless the redirect target is an authentication wall.
+
+When unsure whether a gate can be clicked through, prefer broken: a failed
+recapture only costs another attempt, while a wrong miss silently discards
+the source.
+
+A snapshot is NOT broken — return kind="miss" with a short reason naming
+what the page is — when it shows that the URL itself can never satisfy the
+objective:
+
+- 404 or otherwise missing pages, including parked domains: the URL is dead
+  and no recapture will change that.
+- Login walls or paywalls that require an account or subscription: no click
+  reveals public content behind them.
 
 A usable snapshot that simply contains nothing relevant to the objective is
-NOT broken: return kind="miss". The requested URL, final URL, HTTP status,
-and capture error are context only: use them to interpret the snapshot, but
-the outline, metadata, and viewed images decide whether it is broken.
+also NOT broken: return kind="miss". The requested URL, final URL, HTTP
+status, and capture error corroborate these decisions (a 404 status confirms
+a not-found outline), but the outline, metadata, and viewed images are the
+primary evidence.
 
 # Final check
 
@@ -286,21 +305,34 @@ _Reason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class Miss(BaseModel):
-    """Usable snapshot that contains nothing satisfying the objective."""
+    """Usable snapshot that contains nothing satisfying the objective.
+
+    Includes pages that are dead or account-gated — a 404, a parked domain,
+    a login wall: the capture is usable evidence that the URL can never
+    satisfy the objective.
+    """
 
     kind: Literal["miss"] = "miss"
     reason: _Reason = Field(
         description=(
-            "What the page does contain and why it falls short of the objective."
+            "What the page does contain — for a dead or gated page, what it "
+            "is (404 page, parked domain, login wall) — and why it falls "
+            "short of the objective."
         )
     )
 
 
 class BrokenSnapshot(BaseModel):
-    """Result for a Pravda snapshot that cannot be used as a source."""
+    """Result for a Pravda snapshot whose capture failed.
+
+    Broken means unusable as a source in a way a fresh recapture may fix:
+    more patience, or interaction such as clicking through a consent wall.
+    """
 
     kind: Literal["broken"] = "broken"
-    reason: _Reason = Field(description="Why the snapshot is unusable.")
+    reason: _Reason = Field(
+        description="What blocks the content and what a recapture must overcome."
+    )
 
 
 PageResult = Annotated[Hit | Miss | BrokenSnapshot, Field(discriminator="kind")]
