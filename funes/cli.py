@@ -1,4 +1,4 @@
-"""Command-line interface for the deferred capture and extraction pipeline."""
+"""Command-line interface for the deferred capture and inspection pipeline."""
 
 import asyncio
 import logging
@@ -13,7 +13,7 @@ from funes.config import load_config
 from funes.migrate import migrate
 from funes.procrastinate import app
 from funes.sources import load_inputs
-from funes.tasks import process_page
+from funes.tasks import inspect_candidate
 
 log = logging.getLogger("funes")
 
@@ -26,8 +26,9 @@ def cli() -> None:
 @cli.command(
     help=(
         "Apply Pravda's packaged migrations, then Funes's own, then "
-        "append-only import dataset/URL/organization rows from the input CSVs."
-    ),
+        "append-only import dataset/objective/URL candidate rows from the "
+        "input CSVs."
+    )
 )
 def migrate_cmd() -> None:
     config = load_config()
@@ -41,7 +42,7 @@ def migrate_cmd() -> None:
         engine = create_async_engine(config.pravda.database_url)
         try:
             async with async_sessionmaker(engine, expire_on_commit=False)() as session:
-                await db.import_pages(session, rows)
+                await db.import_candidates(session, rows)
                 await session.commit()
         finally:
             await engine.dispose()
@@ -51,39 +52,45 @@ def migrate_cmd() -> None:
 
 @cli.command(
     help=(
-        "Queue one pipeline job per due page and exit. A page is due when it "
-        "has never been inspected, or its latest inspection was productive "
-        "and older than the revisit interval; empty and broken pages are "
-        "not re-enqueued."
+        "Queue one inspection job per due candidate and exit. A candidate "
+        "is due when it has never been attempted, or its latest attempt "
+        "was a hit inspection older than the revisit interval; candidates "
+        "whose latest attempt ended in a miss are not re-enqueued, and "
+        "broken snapshots are the repair queue's business."
     )
 )
 def enqueue_cmd() -> None:
     config = load_config()
 
     async def enqueue() -> None:
-        """Select due pages from the database and queue one job per page."""
+        """Select due candidates and queue one job per candidate."""
         engine = create_async_engine(config.pravda.database_url)
         try:
             async with async_sessionmaker(engine, expire_on_commit=False)() as session:
-                pages = await db.select_due_pages(session, config.revisit_interval)
-            page_ids = [str(page.id) for page in pages]
+                candidates = await db.select_due_candidates(
+                    session, config.revisit_interval
+                )
         finally:
             await engine.dispose()
+        candidate_ids = [str(candidate.id) for candidate in candidates]
 
         queued = skipped = 0
         async with app.open_async():
-            for page_id in page_ids:
+            for candidate_id in candidate_ids:
                 try:
-                    await process_page.configure(
-                        queueing_lock=f"page:{page_id}"
-                    ).defer_async(page_id=page_id)
+                    await inspect_candidate.configure(
+                        queueing_lock=f"candidate:{candidate_id}"
+                    ).defer_async(candidate_id=candidate_id)
                     queued += 1
                 except AlreadyEnqueued:
-                    # A page with a job still pending is skipped so one stale
-                    # pending job never aborts the whole sweep.
+                    # A candidate with a job still pending is skipped so one
+                    # stale pending job never aborts the whole sweep.
                     skipped += 1
         log.info(
-            "%d due, %d queued, %d already pending", len(page_ids), queued, skipped
+            "%d due, %d queued, %d already pending",
+            len(candidate_ids),
+            queued,
+            skipped,
         )
 
     asyncio.run(enqueue())
