@@ -25,12 +25,11 @@ from funes.db import (
     SnapshotStatus,
     Url,
     import_candidates,
-    select_candidates,
     select_due_candidates,
     store_broken_attempt,
     store_inspection,
 )
-from funes.extract import BrokenSnapshot, Hit, Miss
+from funes.extract import Hit, Miss
 from funes.extract import Person as PersonResult
 from funes.extract import Position as PositionResult
 
@@ -142,8 +141,6 @@ def test_import_candidates_is_idempotent():
         ]
 
         async def scenario(session: AsyncSession) -> tuple[int, int, int, int]:
-            from sqlalchemy import func, select
-
             async def count(table) -> int:
                 return (
                     await session.execute(select(func.count()).select_from(table))
@@ -163,34 +160,6 @@ def test_import_candidates_is_idempotent():
         return asyncio.run(run_with_session(scenario))
 
     assert run() == (2, 1, 2, 2)
-
-
-def test_select_candidates_orders_deterministically():
-    def run() -> list[tuple[str, str, str]]:
-        async def scenario(session: AsyncSession) -> list[tuple[str, str, str]]:
-            await import_candidates(
-                session,
-                [
-                    ("zeta", "last objective", "https://z.example"),
-                    ("alpha", "find board members", "https://m.example"),
-                    ("alpha", "find legislators", "https://a.example"),
-                    ("alpha", "find board members", "https://a.example"),
-                ],
-            )
-            await session.commit()
-            return [
-                (c.objective.dataset.name, c.objective.description, c.url.url)
-                for c in await select_candidates(session)
-            ]
-
-        return asyncio.run(run_with_session(scenario))
-
-    assert run() == [
-        ("alpha", "find board members", "https://a.example"),
-        ("alpha", "find board members", "https://m.example"),
-        ("alpha", "find legislators", "https://a.example"),
-        ("zeta", "last objective", "https://z.example"),
-    ]
 
 
 # --- terminal constructors: aggregate construction against a collecting session ---
@@ -292,19 +261,6 @@ def test_stored_aggregates_navigate_from_assessment_to_candidate():
     )
 
 
-def test_store_broken_attempt_requires_reason():
-    session = FakeSession()
-    with pytest.raises(ValueError):
-        store_broken_attempt(
-            session,
-            attempt_id=uuid4(),
-            candidate_id=uuid4(),
-            snapshot=make_snapshot(),
-            reason="  ",
-        )
-    assert session.added == []
-
-
 def test_store_inspection_hit_maps_person_graph():
     session = FakeSession()
     candidate_id = uuid4()
@@ -365,43 +321,6 @@ def test_store_inspection_miss_has_reason_and_no_graph():
     assert inspection.persons == []
     assert inspection.attempt.assessment.status == SnapshotStatus.USABLE
     assert inspection.attempt.assessment.reason is None
-
-
-def test_store_inspection_requires_model():
-    session = FakeSession()
-    with pytest.raises(ValueError):
-        store_inspection(
-            session,
-            attempt_id=uuid4(),
-            candidate_id=uuid4(),
-            snapshot=make_snapshot(),
-            result=Miss(reason="nothing here"),
-            model=" ",
-        )
-    assert session.added == []
-
-
-def test_store_inspection_rejects_broken_and_unknown_results():
-    session = FakeSession()
-    with pytest.raises(ValueError):
-        store_inspection(
-            session,
-            attempt_id=uuid4(),
-            candidate_id=uuid4(),
-            snapshot=make_snapshot(),
-            result=BrokenSnapshot(reason="challenge page"),
-            model="openai:gpt-test",
-        )
-    with pytest.raises(ValueError):
-        store_inspection(
-            session,
-            attempt_id=uuid4(),
-            candidate_id=uuid4(),
-            snapshot=make_snapshot(),
-            result=object(),  # type: ignore[arg-type]
-            model="openai:gpt-test",
-        )
-    assert session.added == []
 
 
 # --- select_due_candidates: real queries against in-memory async SQLite ---

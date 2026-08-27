@@ -41,7 +41,7 @@ def migrate_cmd() -> None:
         log.info("%d input row(s)", len(rows))
         engine = create_async_engine(config.pravda.database_url)
         try:
-            async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+            async with async_sessionmaker(engine)() as session:
                 await db.import_candidates(session, rows)
                 await session.commit()
         finally:
