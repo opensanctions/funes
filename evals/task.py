@@ -25,10 +25,15 @@ async def extract(inputs: FixtureInput, model: Model | str) -> PageResult:
     har = (
         json.loads(har_path.read_text(encoding="utf-8")) if har_path.exists() else None
     )
+    final_url = inputs.final_url or inputs.url
     metadata = metadata_from_html(
-        inputs.url, html, final_url=inputs.url, http_status=200
+        inputs.url,
+        html,
+        final_url=final_url,
+        http_status=inputs.http_status,
+        capture_error=inputs.capture_error,
     )
-    outline = build_outline(inputs.url, html, har)
+    outline = build_outline(final_url, html, har)
 
     async def read_resource(body_path: str) -> bytes:
         fixture_root = FIXTURES.resolve()

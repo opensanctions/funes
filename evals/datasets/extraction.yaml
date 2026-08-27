@@ -66,6 +66,80 @@ cases:
     kind: broken
     reason: Bot-detection security challenge interstitial ("Just a moment...",
       "verifies you are not a bot"); no usable source content.
+- name: not_found
+  inputs:
+    fixture: not_found
+    url: https://www.nw-tribunal.example.org/secretariat/council
+    http_status: 404
+    objective: Identify the judges and officeholders of the Northwest Tribunal's
+      secretariat council.
+  expected_output:
+    kind: miss
+    reason: The URL returns a 404 page and therefore provides no council roster.
+- name: account_login
+  inputs:
+    fixture: account_login
+    url: https://members.nw-tribunal.example.org/secretariat/council
+    objective: Identify the judges and officeholders of the Northwest Tribunal's
+      secretariat council.
+  expected_output:
+    kind: miss
+    reason: The page requires an existing member account and exposes no public
+      council content.
+- name: subscription_paywall
+  inputs:
+    fixture: subscription_paywall
+    url: https://directory.northstar.example.org/leadership
+    objective: Identify the leaders of the Northstar Forum.
+  expected_output:
+    kind: miss
+    reason: The directory requires a paid subscription and exposes no public
+      leadership content.
+- name: cookie_consent_wall
+  inputs:
+    fixture: cookie_consent_wall
+    url: https://www.northstar.example.org/leadership
+    objective: Identify the leaders of the Northstar Forum.
+  expected_output:
+    kind: broken
+    reason: A click-through cookie and terms gate blocks the page content.
+- name: server_error
+  inputs:
+    fixture: server_error
+    url: https://www.northstar.example.org/leadership
+    http_status: 503
+    capture_error: upstream service unavailable
+    objective: Identify the leaders of the Northstar Forum.
+  expected_output:
+    kind: broken
+    reason: The capture contains only a transient 503 service-unavailable page.
+- name: server_error_with_content
+  inputs:
+    fixture: server_error_with_content
+    url: https://www.northstar.example.org/leadership
+    http_status: 503
+    capture_error: secondary service request returned 503
+    objective: Identify the leaders of the Northstar Forum.
+  expected_output:
+    kind: hit
+    persons:
+    - name: Amara Vale
+      positions:
+      - name: President
+        organization: Northstar Forum
+    - name: Tomas Ilyan
+      positions:
+      - name: Secretary-General
+        organization: Northstar Forum
+- name: unexpected_redirect
+  inputs:
+    fixture: unexpected_redirect
+    url: https://www.northstar.example.org/leadership
+    final_url: https://search.example.net/
+    objective: Identify the leaders of the Northstar Forum.
+  expected_output:
+    kind: broken
+    reason: The capture unexpectedly redirected to an unrelated search portal.
 - name: elections_no_holders
   inputs:
     fixture: elections_no_holders

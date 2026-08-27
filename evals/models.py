@@ -4,9 +4,11 @@ from pydantic import BaseModel
 
 
 class FixtureInput(BaseModel):
-    """One frozen page: the fixture file stem, its fictional final URL, and
-    the objective the inspection runs against."""
+    """One frozen capture and the objective inspected against it."""
 
     fixture: str
     url: str
     objective: str
+    final_url: str | None = None
+    http_status: int | None = 200
+    capture_error: str | None = None

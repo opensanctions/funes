@@ -1,7 +1,7 @@
 {
   "$defs": {
     "BrokenSnapshot": {
-      "description": "Result for a Pravda snapshot that cannot be used as a source.",
+      "description": "Nonterminal capture failure eligible for supported recapture.",
       "properties": {
         "kind": {
           "const": "broken",
@@ -10,7 +10,7 @@
           "type": "string"
         },
         "reason": {
-          "description": "Why the snapshot is unusable.",
+          "description": "The observed condition blocking content.",
           "minLength": 1,
           "title": "Reason",
           "type": "string"
@@ -166,7 +166,7 @@
       "type": "object"
     },
     "FixtureInput": {
-      "description": "One frozen page: the fixture file stem, its fictional final URL, and\nthe objective the inspection runs against.",
+      "description": "One frozen capture and the objective inspected against it.",
       "properties": {
         "fixture": {
           "title": "Fixture",
@@ -179,6 +179,42 @@
         "objective": {
           "title": "Objective",
           "type": "string"
+        },
+        "final_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Final Url"
+        },
+        "http_status": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 200,
+          "title": "Http Status"
+        },
+        "capture_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capture Error"
         }
       },
       "required": [
@@ -897,7 +933,7 @@
       "type": "string"
     },
     "Miss": {
-      "description": "Usable snapshot that contains nothing satisfying the objective.",
+      "description": "Terminal inspection result with no objective-matching relationship.\n\nThe capture either supplies usable but irrelevant content or establishes\nthat the source is unavailable to supported repair, such as a 404,\naccount login, or subscription paywall.",
       "properties": {
         "kind": {
           "const": "miss",
@@ -906,7 +942,7 @@
           "type": "string"
         },
         "reason": {
-          "description": "What the page does contain and why it falls short of the objective.",
+          "description": "What the captured page is and why it does not meet the objective.",
           "minLength": 1,
           "title": "Reason",
           "type": "string"
@@ -1065,7 +1101,7 @@
     "Person": {
       "properties": {
         "name": {
-          "description": "Full name of the person, exactly as written.",
+          "description": "Person's name exactly as written. Preserve displayed honorifics and do not expand initials.",
           "title": "Name",
           "type": "string"
         },

@@ -103,12 +103,14 @@ def test_union_discriminates_on_kind():
         result_adapter.validate_python({"kind": "miss", "reason": "no holders"}), Miss
     )
     assert isinstance(
-        result_adapter.validate_python({"kind": "broken", "reason": "404"}),
+        result_adapter.validate_python({"kind": "broken", "reason": "bot challenge"}),
         BrokenSnapshot,
     )
     assert (
-        result_adapter.validate_python({"kind": "broken", "reason": " 404 "}).reason
-        == "404"
+        result_adapter.validate_python(
+            {"kind": "broken", "reason": " bot challenge "}
+        ).reason
+        == "bot challenge"
     )
     with pytest.raises(ValidationError):
         result_adapter.validate_python({"kind": "other"})
@@ -406,10 +408,11 @@ def test_build_prompt_marks_context_and_includes_error():
     )
     outline = '- main:\n  - h1 "Board"\n  - img "logo" [src=https://example.org/l.png] [body=bodies/l.png]'
     prompt = build_prompt("Find the board members.", metadata, outline)
-    assert "Requested URL (context only): https://example.org/x" in prompt
-    assert "Final URL (context only): https://example.org/y" in prompt
-    assert "HTTP status (context only): 503" in prompt
-    assert "Capture error (context only): navigation timeout" in prompt
+    assert "<page_snapshot>" in prompt and "</page_snapshot>" in prompt
+    assert "Requested URL: https://example.org/x" in prompt
+    assert "Final URL: https://example.org/y" in prompt
+    assert "HTTP status: 503" in prompt
+    assert "Capture error: navigation timeout" in prompt
     assert "Document title: T" in prompt
     assert "Meta description: [not provided]" in prompt
     assert f"<page_outline>\n{outline}\n</page_outline>" in prompt
@@ -424,7 +427,7 @@ def test_build_prompt_omits_absent_optional_fields():
     )
     prompt = build_prompt("List the mayors.", metadata, '- text: "empty"')
     assert "Capture error" not in prompt
-    assert "HTTP status (context only): [not provided]" in prompt
+    assert "HTTP status: [not provided]" in prompt
     assert '<page_outline>\n- text: "empty"\n</page_outline>' in prompt
 
 
