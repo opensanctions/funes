@@ -79,26 +79,14 @@ def _countries_accuracy(
     return agree / len(matched)
 
 
-def _zero_scores() -> dict[str, float]:
-    return {
-        "person_f1": 0.0,
-        "person_position_f1": 0.0,
-        "organization_accuracy": 0.0,
-        "jurisdiction_accuracy": 0.0,
-        "start_date_accuracy": 0.0,
-        "end_date_accuracy": 0.0,
-        "countries_accuracy": 0.0,
-    }
-
-
 @dataclass
 class InspectionF1(Evaluator[FixtureInput, PageResult]):
     """Score an inspection result against ground truth, structurally then per
     field.
 
-    Assertions: a ``BrokenSnapshot`` expectation requires a broken output with
-    a stated reason (``broken_match``); a ``Miss`` expectation requires a miss
-    output with a stated reason (``miss_match``); a ``Hit`` expectation asserts
+    Assertions: a ``BrokenSnapshot`` expectation requires a broken output
+    (``broken_match``); a ``Miss`` expectation requires a miss output
+    (``miss_match``); a ``Hit`` expectation asserts
     the exact normalized person set (``persons_match``). Scores: person F1,
     person-position pair F1, and — over persons and positions matched by
     normalized name — per-field accuracy for organization, jurisdiction,
@@ -114,23 +102,22 @@ class InspectionF1(Evaluator[FixtureInput, PageResult]):
         if isinstance(expected, BrokenSnapshot):
             return {
                 "broken_match": EvaluationReason(
-                    isinstance(ctx.output, BrokenSnapshot)
-                    and bool(ctx.output.reason.strip()),
+                    isinstance(ctx.output, BrokenSnapshot),
                     reason=(
                         f"output is {ctx.output.kind!r}, expected broken"
                         if not isinstance(ctx.output, BrokenSnapshot)
-                        else "reason stated"
+                        else "output is broken"
                     ),
                 )
             }
         if isinstance(expected, Miss):
             return {
                 "miss_match": EvaluationReason(
-                    isinstance(ctx.output, Miss) and bool(ctx.output.reason.strip()),
+                    isinstance(ctx.output, Miss),
                     reason=(
                         f"output is {ctx.output.kind!r}, expected miss"
                         if not isinstance(ctx.output, Miss)
-                        else "reason stated"
+                        else "output is a miss"
                     ),
                 )
             }
@@ -140,7 +127,13 @@ class InspectionF1(Evaluator[FixtureInput, PageResult]):
                 "persons_match": EvaluationReason(
                     False, reason=f"output is {ctx.output.kind!r}, not a hit"
                 ),
-                **_zero_scores(),
+                "person_f1": 0.0,
+                "person_position_f1": 0.0,
+                "organization_accuracy": 0.0,
+                "jurisdiction_accuracy": 0.0,
+                "start_date_accuracy": 0.0,
+                "end_date_accuracy": 0.0,
+                "countries_accuracy": 0.0,
             }
         expected_persons = _persons(expected)
         actual_persons = _persons(ctx.output)

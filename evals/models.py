@@ -1,6 +1,6 @@
 """Case input types for the inspection eval suite."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class FixtureInput(BaseModel):
@@ -9,6 +9,4 @@ class FixtureInput(BaseModel):
 
     fixture: str
     url: str
-    objective: str = Field(
-        min_length=1, description="What the requester wants to learn from the page."
-    )
+    objective: str

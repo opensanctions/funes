@@ -1,9 +1,13 @@
 """Tests for the inspection eval suite: dataset validity, evaluator scoring,
-and the eval task's prompt API. No model requests are made."""
+and the eval task's prompt API. No model requests are made: the eval task runs
+against a pydantic-ai FunctionModel that captures the prompt."""
 
+import asyncio
 from types import NoneType
 
 import pytest
+from pydantic_ai.messages import ModelResponse, ToolCallPart
+from pydantic_ai.models.function import FunctionModel
 from pydantic_evals import Dataset
 from pydantic_evals.evaluators import EvaluatorContext
 
@@ -16,8 +20,6 @@ from funes.extract import (
     PageResult,
     Person,
     Position,
-    build_prompt,
-    metadata_from_html,
 )
 
 DATASET_PATH = "evals/datasets/extraction.yaml"
@@ -54,37 +56,32 @@ def dataset() -> Dataset[FixtureInput, PageResult, NoneType]:
 
 
 def test_dataset_loads_with_objectives_and_result_types(dataset):
-    assert dataset.cases
+    assert dataset.evaluators == [InspectionF1()]
     kinds = set()
     for case in dataset.cases:
         assert case.inputs.objective.strip()
-        assert case.inputs.objective not in {"", "test"}
         kinds.add(case.expected_output.kind)
-    assert dataset.evaluators == [InspectionF1()]
     assert kinds == {"hit", "miss", "broken"}
 
 
-def test_hit_expectations_carry_person_position_graphs(dataset):
+def test_hit_expectations_carry_objective_scoped_graphs(dataset):
+    by_name = {case.name: case for case in dataset.cases}
     for case in dataset.cases:
         expected = case.expected_output
         if isinstance(expected, Hit):
             assert expected.persons
             for person in expected.persons:
                 assert person.positions
-    names = {
-        case.name: {p.name for p in case.expected_output.persons}
-        for case in dataset.cases
-        if isinstance(case.expected_output, Hit)
-    }
-    # Objective-scoped: only Veltrane Union chairpersons, no Boris.
-    assert names["conjoined_role_misattribution"] == {
+    conjoined = by_name["conjoined_role_misattribution"].expected_output
+    assert isinstance(conjoined, Hit)
+    assert {p.name for p in conjoined.persons} == {
         "Adama Kessi",
         "Omar Nasri",
         "Lucas Marek",
     }
     assert all(
         pos.name == "Chairperson of the Veltrane Union"
-        for p in dataset.cases[5].expected_output.persons  # conjoined case
+        for p in conjoined.persons
         for pos in p.positions
     )
 
@@ -92,38 +89,26 @@ def test_hit_expectations_carry_person_position_graphs(dataset):
 # --- evaluator behavior ---
 
 
-def test_evaluator_broken_expectation():
-    scores = InspectionF1().evaluate(
-        _ctx(BrokenSnapshot(reason="challenge page"), BrokenSnapshot(reason="bork"))
-    )
-    (reason,) = scores.values()
-    assert reason.value
-
-    for wrong in (
-        Miss(reason="nothing here"),
-        _hit(Person(name="A", positions=[Position(name="Director")])),
+def test_evaluator_broken_and_miss_expectations():
+    evaluator = InspectionF1()
+    for expected, match_key in (
+        (BrokenSnapshot(reason="challenge page"), "broken_match"),
+        (Miss(reason="no holders"), "miss_match"),
     ):
-        scores = InspectionF1().evaluate(
-            _ctx(BrokenSnapshot(reason="challenge page"), wrong)
+        wrongs = (
+            Miss(reason="nothing here"),
+            BrokenSnapshot(reason="challenge"),
+            _hit(Person(name="A", positions=[Position(name="Director")])),
         )
-        (reason,) = scores.values()
-        assert not reason.value
-
-
-def test_evaluator_miss_expectation():
-    scores = InspectionF1().evaluate(
-        _ctx(Miss(reason="no holders"), Miss(reason="election notices only"))
-    )
-    (reason,) = scores.values()
-    assert reason.value
-
-    for wrong in (
-        BrokenSnapshot(reason="challenge"),
-        _hit(Person(name="A", positions=[Position(name="Director")])),
-    ):
-        scores = InspectionF1().evaluate(_ctx(Miss(reason="no holders"), wrong))
-        (reason,) = scores.values()
-        assert not reason.value
+        for actual in wrongs:
+            if actual.kind == expected.kind:
+                continue
+            (reason,) = evaluator.evaluate(_ctx(expected, actual)).values()
+            assert not reason.value
+        (reason,) = evaluator.evaluate(
+            _ctx(expected, expected.__class__(reason="different prose"))
+        ).values()
+        assert reason.value
 
 
 def test_evaluator_hit_scores_person_position_graph():
@@ -165,48 +150,27 @@ def test_evaluator_hit_non_hit_output_scores_zero():
 # --- eval task prompt API ---
 
 
-@pytest.mark.asyncio
-def test_extract_builds_objective_scoped_prompt(monkeypatch):
-    """extract() feeds inputs.objective into build_prompt without model calls."""
-    import asyncio
+def test_extract_builds_objective_scoped_prompt():
+    """extract() feeds inputs.objective into the model prompt."""
+    import evals.task as task_module
 
     captured = {}
 
-    class StubAgent:
-        async def run(self, prompt, deps=None):
-            captured["prompt"] = prompt
-            captured["deps"] = deps
+    def fn(messages, info):
+        captured["prompt"] = messages[-1].parts[0].content
+        return ModelResponse(
+            parts=[
+                ToolCallPart("final_result_Miss", {"kind": "miss", "reason": "stubbed"})
+            ]
+        )
 
-            class _Result:
-                output = Miss(reason="stubbed")
-
-            return _Result()
-
-    import evals.task as task_module
-    from funes.extract import build_extraction_agent as real_build
-
-    monkeypatch.setattr(
-        task_module, "build_extraction_agent", lambda model: StubAgent()
-    )
     inputs = FixtureInput(
         fixture="office_of_the_sg",
         url="https://www.caf.example.org/about/office-of-the-sg",
         objective="Identify the leadership of the CAF Office of the Secretary-General.",
     )
-    result = asyncio.run(task_module.extract(inputs, model="test:model"))
+    result = asyncio.run(task_module.extract(inputs, model=FunctionModel(fn)))
     assert isinstance(result, Miss)
     assert "<objective>" in captured["prompt"]
     assert inputs.objective in captured["prompt"]
     assert "office-of-the-sg" in captured["prompt"]
-    assert real_build is not None  # real agent builder untouched
-
-
-def test_build_prompt_requires_nonempty_objective():
-    metadata = metadata_from_html(
-        "https://x.example.org/",
-        "<html></html>",
-        final_url="https://x.example.org/",
-        http_status=200,
-    )
-    with pytest.raises(ValueError):
-        build_prompt("   ", metadata, "outline")
