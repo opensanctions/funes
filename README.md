@@ -12,10 +12,9 @@ Inputs are CSV files with columns `objective,url`. Each file's stem names a **Da
 
 A worker run on a candidate captures an immutable Pravda **Snapshot** (plaintext, rendered HTML, HAR, screenshot) against a remote browser, Postgres, and an artifact store that Funes owns and runs. The run becomes an **Attempt** linking the candidate to the snapshot. Infra failures (exceptions) write no attempt; retrying them is Procrastinate's business, not a domain fact.
 
-Each completed attempt records one of two terminal judgements:
+Every completed attempt records exactly one **SnapshotAssessment** — the judgement of the snapshot itself: `usable` or `broken`. Snapshot usability is objective-independent. Broken is explicit and routed to a dormant repair queue the normal worker does not consume; brokenness is never attached to a URL, and it produces no inspection.
 
-- A **SnapshotAssessment** judges the snapshot itself: `usable` or `broken`. Broken is snapshot-level and explicit — the same snapshot may look fine for other purposes — and broken snapshots are routed to a dormant repair queue the normal worker does not consume. Brokenness is never attached to a URL, and it produces no inspection.
-- A **usable** snapshot additionally gets an objective-relative **Inspection**: `hit` (the objective is satisfied; extracted persons and their positions are attached) or `miss` (nothing on the page satisfies the objective, with a reason). Hits are revisited after an interval; misses are not normally retried.
+A usable assessment additionally gets exactly one objective-relative **Inspection**: `hit` (the objective is satisfied; extracted persons and their positions are attached) or `miss` (nothing on the page satisfies the objective, with a reason). Hits are revisited after an interval; misses are not normally retried.
 
 Extraction feeds a compact outline of the rendered HTML plus page metadata to an LLM, which can fetch page resources such as images through a tool. Each agent run's message history is written as one JSON transcript under `SESSIONS_BASE_PATH`.
 

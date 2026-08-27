@@ -31,7 +31,7 @@ funes/
   cli.py        # migrate, enqueue commands
   tasks.py      # Procrastinate tasks: inspect_candidate pipeline; dormant repair_snapshot
   capture.py    # Pravda client and fsspec artifact helpers
-  extract.py    # pydantic-ai extraction agent, Hit/Miss output schema, prompt
+  extract.py    # pydantic-ai extraction agent, Hit/Miss/BrokenSnapshot output schema, prompt
   outline.py    # compact model-facing outline from rendered HTML + HAR
   db.py         # SQLAlchemy models: Objective/URL/Candidate/Attempt persistence
   migrate.py    # Alembic runner; migrations/ holds Funes's ledger
