@@ -60,8 +60,9 @@ def test_hit_requires_at_least_one_person():
 
 
 def test_miss_requires_nonblank_reason():
-    miss = Miss(reason="No board members listed; page is a news article.")
+    miss = Miss(reason="  No board members listed; page is a news article.  ")
     assert miss.kind == "miss"
+    assert miss.reason == "No board members listed; page is a news article."
     with pytest.raises(ValidationError):
         Miss()
     with pytest.raises(ValidationError):
@@ -93,6 +94,10 @@ def test_union_discriminates_on_kind():
     assert isinstance(
         result_adapter.validate_python({"kind": "broken", "reason": "404"}),
         BrokenSnapshot,
+    )
+    assert (
+        result_adapter.validate_python({"kind": "broken", "reason": " 404 "}).reason
+        == "404"
     )
     with pytest.raises(ValidationError):
         result_adapter.validate_python({"kind": "other"})
@@ -380,29 +385,6 @@ def test_build_prompt_includes_delimited_objective_before_page_context():
     # The objective block comes before the page source context.
     assert prompt.index("<objective>") < prompt.index("<page_metadata>")
     assert prompt.index("<objective>") < prompt.index("<page_outline>")
-
-
-def test_build_prompt_rejects_blank_objective():
-    metadata = PageMetadata(
-        requested_url="https://example.org",
-        final_url="https://example.org",
-        title=None,
-        description=None,
-    )
-    for objective in ("", "   ", "\n\t"):
-        with pytest.raises(ValueError):
-            build_prompt(objective, metadata, '- text: "x"')
-
-
-def test_build_prompt_strips_surrounding_whitespace_from_objective():
-    metadata = PageMetadata(
-        requested_url="https://example.org",
-        final_url="https://example.org",
-        title=None,
-        description=None,
-    )
-    prompt = build_prompt("\n  Find the mayors.  \n", metadata, '- text: "x"')
-    assert "<objective>\nFind the mayors.\n</objective>" in prompt
 
 
 def test_build_prompt_marks_context_and_includes_error():

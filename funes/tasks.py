@@ -5,7 +5,6 @@ import uuid
 from enum import StrEnum
 from functools import partial
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import selectinload
 
@@ -76,15 +75,14 @@ async def inspect_candidate(candidate_id: str) -> None:
     engine = create_async_engine(config.pravda.database_url)
     try:
         async with async_sessionmaker(engine, expire_on_commit=False)() as session:
-            result = await session.execute(
-                select(db.Candidate)
-                .where(db.Candidate.id == uuid.UUID(candidate_id))
-                .options(
+            candidate = await session.get(
+                db.Candidate,
+                uuid.UUID(candidate_id),
+                options=(
                     selectinload(db.Candidate.objective),
                     selectinload(db.Candidate.url),
-                )
+                ),
             )
-            candidate = result.scalars().first()
             if candidate is None:
                 raise LookupError(f"candidate {candidate_id} not found")
             url = candidate.url.url
@@ -162,32 +160,6 @@ async def inspect_candidate(candidate_id: str) -> None:
                     )
                 case Miss() as miss:
                     log.info("%s → miss: %s", snapshot.final_url, miss.reason)
-                    prior = (
-                        (
-                            await session.execute(
-                                select(db.Inspection)
-                                .join(
-                                    db.Attempt,
-                                    db.Attempt.id == db.Inspection.attempt_id,
-                                )
-                                .where(db.Attempt.candidate_id == candidate.id)
-                                .order_by(
-                                    db.Attempt.created_at.desc(),
-                                    db.Attempt.id.desc(),
-                                )
-                                .limit(1)
-                            )
-                        )
-                        .scalars()
-                        .first()
-                    )
-                    if prior is not None and prior.outcome == db.InspectionOutcome.HIT:
-                        log.warning(
-                            "%s → miss after a prior hit inspection; "
-                            "a candidate that last hit no longer satisfied "
-                            "the objective",
-                            url,
-                        )
             db.store_inspection(
                 session,
                 attempt_id=attempt_id,

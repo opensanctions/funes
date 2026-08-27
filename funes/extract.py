@@ -6,8 +6,9 @@ from dataclasses import dataclass
 from typing import Annotated, Literal
 
 from bs4 import BeautifulSoup
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StringConstraints
 from pydantic_ai import Agent, BinaryContent, ModelRetry, RunContext
+from pydantic_ai.models import Model
 
 log = logging.getLogger("funes")
 
@@ -281,34 +282,26 @@ class Hit(BaseModel):
     )
 
 
-class _ReasonedResult(BaseModel):
-    reason: str = Field(min_length=1)
-
-    @field_validator("reason")
-    @classmethod
-    def reason_not_blank(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("reason must not be blank")
-        return value
+# A reason is a non-blank string with surrounding whitespace stripped.
+_Reason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
-class Miss(_ReasonedResult):
+class Miss(BaseModel):
     """Usable snapshot that contains nothing satisfying the objective."""
 
     kind: Literal["miss"] = "miss"
-    reason: str = Field(
-        min_length=1,
+    reason: _Reason = Field(
         description=(
             "What the page does contain and why it falls short of the objective."
-        ),
+        )
     )
 
 
-class BrokenSnapshot(_ReasonedResult):
+class BrokenSnapshot(BaseModel):
     """Result for a Pravda snapshot that cannot be used as a source."""
 
     kind: Literal["broken"] = "broken"
-    reason: str = Field(min_length=1, description="Why the snapshot is unusable.")
+    reason: _Reason = Field(description="Why the snapshot is unusable.")
 
 
 PageResult = Annotated[Hit | Miss | BrokenSnapshot, Field(discriminator="kind")]
@@ -353,7 +346,7 @@ async def view_resource(
 
 
 def build_extraction_agent(
-    model: str,
+    model: Model | str,
 ) -> Agent[ExtractionDependencies, PageResult]:
     """Build the reusable extraction agent for *model*.
 
@@ -363,9 +356,10 @@ def build_extraction_agent(
     paths in the DOM outline; callers must pass matching
     ``ExtractionDependencies`` with every ``agent.run`` call.
 
-    *model* is a full Pydantic AI model id (``provider:model``, e.g.
+    *model* is either a full Pydantic AI model id (``provider:model``, e.g.
     ``openai:gpt-5.6-luna`` or ``anthropic:claude-sonnet-4-6``) passed straight
-    through, so the provider is chosen by configuration.
+    through, so the provider is chosen by configuration, or an already-built
+    ``Model`` instance (e.g. a ``FunctionModel``/``TestModel`` in tests).
     """
     return Agent(
         model,
@@ -383,18 +377,9 @@ def build_prompt(objective: str, metadata: PageMetadata, outline: str) -> str:
 
     Returns the trusted, clearly delimited ``<objective>`` block followed by
     the ``<page_metadata>`` / ``<page_outline>`` source block carrying the
-    page metadata slice and the full DOM outline. Raises ``ValueError`` for
-    an objective that is empty or whitespace-only.
+    page metadata slice and the full DOM outline.
     """
-    objective = objective.strip()
-    if not objective:
-        raise ValueError("objective must not be empty or whitespace-only")
     objective_block = "<objective>\n" + objective + "\n</objective>\n\n"
-    return objective_block + _page_source_block(metadata, outline)
-
-
-def _page_source_block(metadata: PageMetadata, outline: str) -> str:
-    """Build the page source context: metadata slice and DOM outline."""
     status = "[not provided]"
     if metadata.http_status is not None:
         status = str(metadata.http_status)
@@ -407,12 +392,13 @@ def _page_source_block(metadata: PageMetadata, outline: str) -> str:
         lines.append(f"Capture error (context only): {metadata.capture_error}")
     lines.append(f"Document title: {metadata.title or '[not provided]'}")
     lines.append(f"Meta description: {metadata.description or '[not provided]'}")
-    return (
+    source_block = (
         "<page_metadata>\n" + "\n".join(lines) + "\n</page_metadata>\n\n"
         "<page_outline>\n"
         f"{outline}\n"
         "</page_outline>"
     )
+    return objective_block + source_block
 
 
 def metadata_from_html(

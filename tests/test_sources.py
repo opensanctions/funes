@@ -1,7 +1,6 @@
 """Unit tests for input CSV loading."""
 
 import fsspec
-import pytest
 
 
 def write_csv(fs, base, name, content):
@@ -10,23 +9,17 @@ def write_csv(fs, base, name, content):
         f.write(content)
 
 
-@pytest.fixture
-def memory_fs():
+def test_load_inputs_groups_rows_by_csv_in_filename_order(tmp_path):
     fs = fsspec.filesystem("memory")
-    yield fs
-    fs.store.clear()
-
-
-def test_load_inputs_groups_rows_by_csv_in_filename_order(tmp_path, memory_fs):
     base = f"memory://{tmp_path.name}/inputs"
     write_csv(
-        memory_fs,
+        fs,
         base,
         "two.csv",
         "objective,url\nHeads of Org C,https://c.example\n",
     )
     write_csv(
-        memory_fs,
+        fs,
         base,
         "one.csv",
         "objective,url\nHeads of Org A,https://a.example\nHeads of Org B,https://b.example\n",
@@ -40,10 +33,11 @@ def test_load_inputs_groups_rows_by_csv_in_filename_order(tmp_path, memory_fs):
     ]
 
 
-def test_load_inputs_strips_whitespace(tmp_path, memory_fs):
+def test_load_inputs_strips_whitespace(tmp_path):
+    fs = fsspec.filesystem("memory")
     base = f"memory://{tmp_path.name}/inputs"
     write_csv(
-        memory_fs,
+        fs,
         base,
         "one.csv",
         "objective,url\n  Heads of Org A  ,  https://a.example  \n",

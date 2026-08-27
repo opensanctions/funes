@@ -151,11 +151,7 @@ class Attempt(Base):
 
     candidate: Mapped[Candidate] = relationship(back_populates="attempts")
     assessment: Mapped["SnapshotAssessment | None"] = relationship(
-        back_populates="attempt",
-        primaryjoin="Attempt.snapshot_id == SnapshotAssessment.snapshot_id",
-        foreign_keys="SnapshotAssessment.snapshot_id",
-        uselist=False,
-        cascade="all, delete-orphan",
+        back_populates="attempt", uselist=False, cascade="all, delete-orphan"
     )
     inspection: Mapped["Inspection | None"] = relationship(
         back_populates="attempt", uselist=False, cascade="all, delete-orphan"
@@ -175,12 +171,7 @@ class SnapshotAssessment(Base):
     model: Mapped[str | None] = mapped_column(Text)
     assessed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
-    attempt: Mapped[Attempt] = relationship(
-        back_populates="assessment",
-        primaryjoin="Attempt.snapshot_id == SnapshotAssessment.snapshot_id",
-        foreign_keys=[snapshot_id],
-        uselist=False,
-    )
+    attempt: Mapped[Attempt] = relationship(back_populates="assessment", uselist=False)
 
 
 class Inspection(Base):
@@ -293,51 +284,35 @@ async def import_candidates(
     url_id_by_url = dict(
         (await session.execute(select(Url.url, Url.id).where(Url.url.in_(urls)))).all()
     )
+    objective_keys = sorted(
+        {(dataset_id_by_name[dataset], description) for dataset, description, _ in rows}
+    )
+    await session.execute(
+        insert(Objective)
+        .values(
+            [
+                {
+                    Objective.dataset_id: dataset_id,
+                    Objective.description: description,
+                }
+                for dataset_id, description in objective_keys
+            ]
+        )
+        .on_conflict_do_nothing(
+            index_elements=[Objective.dataset_id, Objective.description]
+        )
+    )
     objective_id_by_key = {
         (dataset_id, description): objective_id
         for dataset_id, description, objective_id in (
             await session.execute(
                 select(Objective.dataset_id, Objective.description, Objective.id).where(
-                    Objective.description.in_(descriptions)
+                    Objective.dataset_id.in_(dataset_id_by_name.values()),
+                    Objective.description.in_(descriptions),
                 )
             )
         ).all()
     }
-    missing_objectives = {
-        (dataset_id_by_name[dataset], description)
-        for dataset, description, _ in rows
-        if (dataset_id_by_name[dataset], description) not in objective_id_by_key
-    }
-    if missing_objectives:
-        await session.execute(
-            insert(Objective)
-            .values(
-                [
-                    {
-                        Objective.dataset_id: dataset_id,
-                        Objective.description: description,
-                    }
-                    for dataset_id, description in sorted(missing_objectives)
-                ]
-            )
-            .on_conflict_do_nothing(
-                index_elements=[Objective.dataset_id, Objective.description]
-            )
-        )
-        objective_id_by_key.update(
-            {
-                (dataset_id, description): objective_id
-                for dataset_id, description, objective_id in (
-                    await session.execute(
-                        select(
-                            Objective.dataset_id,
-                            Objective.description,
-                            Objective.id,
-                        ).where(Objective.description.in_(descriptions))
-                    )
-                ).all()
-            }
-        )
     await session.execute(
         insert(Candidate)
         .values(
@@ -355,30 +330,6 @@ async def import_candidates(
             index_elements=[Candidate.objective_id, Candidate.url_id]
         )
     )
-
-
-async def select_candidates(session: AsyncSession) -> list[Candidate]:
-    """Return all candidates in deterministic order.
-
-    Ordered by dataset name, objective description, then url, so callers
-    (enqueueing, tests) see a stable sequence regardless of insert order.
-    Related objective (with its dataset) and url are eagerly loaded; the
-    attempt history is deliberately not loaded, so queueing never pulls
-    an unbounded inspection history.
-    """
-    stmt = (
-        select(Candidate)
-        .options(
-            selectinload(Candidate.objective).selectinload(Objective.dataset),
-            selectinload(Candidate.url),
-        )
-        .join(Objective, Objective.id == Candidate.objective_id)
-        .join(Dataset, Dataset.id == Objective.dataset_id)
-        .join(Url, Url.id == Candidate.url_id)
-        .order_by(Dataset.name, Objective.description, Url.url)
-    )
-    result = await session.execute(stmt)
-    return list(result.scalars().all())
 
 
 async def select_due_candidates(
@@ -451,12 +402,10 @@ def store_broken_attempt(
 
     Creates the Attempt (with the caller-allocated ``attempt_id`` — the
     Pydantic run/session id and repair routing id) and its BROKEN
-    SnapshotAssessment; no Inspection or person graph. ``reason`` is
-    required; ``model`` is set only when the model itself concluded the
-    snapshot is broken.
+    SnapshotAssessment; no Inspection or person graph. ``reason`` comes
+    from inspectability checks or a validated BrokenSnapshot; ``model``
+    is set only when the model itself concluded the snapshot is broken.
     """
-    if not reason or not reason.strip():
-        raise ValueError("broken attempt requires a non-blank reason")
     now = _now()
     attempt = Attempt(
         id=attempt_id,
@@ -490,42 +439,36 @@ def store_inspection(
     Creates the Attempt (with the caller-allocated ``attempt_id``), its
     USABLE SnapshotAssessment, and the Inspection. A Hit maps the
     person/position graph and must not carry a reason; a Miss carries its
-    reason and no people. ``model`` is required. Unknown result types
-    (including BrokenSnapshot) are rejected.
+    reason and no people. ``model`` is required.
     """
-    if not model or not model.strip():
-        raise ValueError("inspection requires a model")
     now = _now()
-    match result:
-        case Hit():
-            outcome = InspectionOutcome.HIT
-            reason = None
-            persons = [
-                Person(
-                    name=person.name,
-                    dob=person.dob,
-                    bio=person.bio,
-                    countries=person.countries,
-                    positions=[
-                        Position(
-                            name=position.name,
-                            organization=position.organization,
-                            description=position.description,
-                            jurisdiction=position.jurisdiction,
-                            start_date=position.start_date,
-                            end_date=position.end_date,
-                        )
-                        for position in person.positions
-                    ],
-                )
-                for person in result.persons
-            ]
-        case Miss():
-            outcome = InspectionOutcome.MISS
-            reason = result.reason
-            persons = []
-        case other:
-            raise ValueError(f"unknown result type: {type(other).__name__}")
+    if isinstance(result, Hit):
+        outcome = InspectionOutcome.HIT
+        reason = None
+        persons = [
+            Person(
+                name=person.name,
+                dob=person.dob,
+                bio=person.bio,
+                countries=person.countries,
+                positions=[
+                    Position(
+                        name=position.name,
+                        organization=position.organization,
+                        description=position.description,
+                        jurisdiction=position.jurisdiction,
+                        start_date=position.start_date,
+                        end_date=position.end_date,
+                    )
+                    for position in person.positions
+                ],
+            )
+            for person in result.persons
+        ]
+    else:
+        outcome = InspectionOutcome.MISS
+        reason = result.reason
+        persons = []
     attempt = Attempt(
         id=attempt_id,
         candidate_id=candidate_id,
