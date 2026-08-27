@@ -5,7 +5,7 @@ import uuid
 from enum import StrEnum
 from functools import partial
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import selectinload
 
@@ -59,7 +59,7 @@ async def inspect_candidate(candidate_id: str) -> None:
     """Capture one Candidate's URL and judge it against its objective.
 
     Procrastinate is the pending/running/failure ledger; the database
-    records exactly one terminal row per completed run (a Hit/Miss
+    records exactly one terminal aggregate per completed run (a Hit/Miss
     Inspection or a broken SnapshotAssessment). Infra crashes
     (exceptions) write no row — retrying those is Procrastinate's
     business, not a candidate fact. Broken snapshots are additionally
@@ -170,17 +170,12 @@ async def inspect_candidate(candidate_id: str) -> None:
                                     db.Attempt,
                                     db.Attempt.id == db.Inspection.attempt_id,
                                 )
-                                .where(
-                                    db.Attempt.candidate_id == candidate.id,
-                                    db.Inspection.created_at
-                                    == select(func.max(db.Inspection.created_at))
-                                    .join(
-                                        db.Attempt,
-                                        db.Attempt.id == db.Inspection.attempt_id,
-                                    )
-                                    .where(db.Attempt.candidate_id == candidate.id)
-                                    .scalar_subquery(),
+                                .where(db.Attempt.candidate_id == candidate.id)
+                                .order_by(
+                                    db.Attempt.created_at.desc(),
+                                    db.Attempt.id.desc(),
                                 )
+                                .limit(1)
                             )
                         )
                         .scalars()
@@ -189,7 +184,8 @@ async def inspect_candidate(candidate_id: str) -> None:
                     if prior is not None and prior.outcome == db.InspectionOutcome.HIT:
                         log.warning(
                             "%s → miss after a prior hit inspection; "
-                            "a candidate that last hit came back empty",
+                            "a candidate that last hit no longer satisfied "
+                            "the objective",
                             url,
                         )
             db.store_inspection(
