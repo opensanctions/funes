@@ -41,8 +41,8 @@ ENV INPUT_BASE_PATH=/app/datasets \
     PROCRASTINATE_APP=funes.procrastinate.app
 
 # The image's long-running process is the Procrastinate worker on the
-# process queue (the review queue stays dormant until review exists).
+# inspect queue (the repair queue stays dormant until repair exists).
 # One-shot funes commands override the entrypoint, e.g.
 #   podman run --entrypoint funes funes migrate
 ENTRYPOINT ["procrastinate"]
-CMD ["worker", "process"]
+CMD ["worker", "inspect"]

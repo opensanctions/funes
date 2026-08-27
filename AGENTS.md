@@ -15,7 +15,7 @@ uv sync                  # install dependencies
 docker compose up -d     # shared dev infrastructure: Postgres + headed Chrome
 uv run --env-file .env funes migrate      # apply Pravda and Funes schemas, bootstrap candidates from CSVs
 uv run --env-file .env funes enqueue      # queue one job per due candidate
-uv run --env-file .env procrastinate worker --queues process  # consume the process queue only; repair jobs stay pending
+uv run --env-file .env procrastinate worker --queues inspect  # consume the inspect queue only; repair jobs stay pending
 uv run --env-file .env procrastinate shell list_jobs    # inspect the queue
 uv run --env-file .env pytest             # run the test suite
 ```

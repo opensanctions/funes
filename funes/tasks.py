@@ -35,7 +35,7 @@ log = logging.getLogger("funes")
 class Queue(StrEnum):
     """Procrastinate queues, named for the work they carry."""
 
-    PROCESS = "process"
+    INSPECT = "inspect"
     REPAIR = "repair"
 
 
@@ -53,7 +53,7 @@ async def repair_snapshot(attempt_id: str) -> None:
     )
 
 
-@app.task(name=Task.INSPECT_CANDIDATE, queue=Queue.PROCESS)
+@app.task(name=Task.INSPECT_CANDIDATE, queue=Queue.INSPECT)
 async def inspect_candidate(candidate_id: str) -> None:
     """Capture one Candidate's URL and judge it against its objective.
 
