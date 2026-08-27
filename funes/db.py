@@ -166,7 +166,7 @@ class SnapshotAssessment(Base):
     snapshot_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("attempt.snapshot_id", ondelete="CASCADE"), primary_key=True
     )
-    status: Mapped[SnapshotStatus] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text)
     reason: Mapped[str | None] = mapped_column(Text)
     model: Mapped[str | None] = mapped_column(Text)
     assessed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -183,7 +183,7 @@ class Inspection(Base):
     attempt_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("attempt.id", ondelete="CASCADE"), unique=True
     )
-    outcome: Mapped[InspectionOutcome] = mapped_column(Text)
+    outcome: Mapped[str] = mapped_column(Text)
     reason: Mapped[str | None] = mapped_column(Text)
     model: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -284,9 +284,9 @@ async def import_candidates(
     url_id_by_url = dict(
         (await session.execute(select(Url.url, Url.id).where(Url.url.in_(urls)))).all()
     )
-    pairs = [
-        (dataset_id_by_name[dataset], description) for dataset, description, _ in rows
-    ]
+    objective_keys = sorted(
+        {(dataset_id_by_name[dataset], description) for dataset, description, _ in rows}
+    )
     await session.execute(
         insert(Objective)
         .values(
@@ -295,7 +295,7 @@ async def import_candidates(
                     Objective.dataset_id: dataset_id,
                     Objective.description: description,
                 }
-                for dataset_id, description in sorted(set(pairs))
+                for dataset_id, description in objective_keys
             ]
         )
         .on_conflict_do_nothing(

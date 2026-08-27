@@ -283,14 +283,14 @@ class Hit(BaseModel):
 
 
 # A reason is a non-blank string with surrounding whitespace stripped.
-Reason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+_Reason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class Miss(BaseModel):
     """Usable snapshot that contains nothing satisfying the objective."""
 
     kind: Literal["miss"] = "miss"
-    reason: Reason = Field(
+    reason: _Reason = Field(
         description=(
             "What the page does contain and why it falls short of the objective."
         )
@@ -301,7 +301,7 @@ class BrokenSnapshot(BaseModel):
     """Result for a Pravda snapshot that cannot be used as a source."""
 
     kind: Literal["broken"] = "broken"
-    reason: Reason = Field(description="Why the snapshot is unusable.")
+    reason: _Reason = Field(description="Why the snapshot is unusable.")
 
 
 PageResult = Annotated[Hit | Miss | BrokenSnapshot, Field(discriminator="kind")]
