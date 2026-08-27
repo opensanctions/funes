@@ -91,9 +91,9 @@ def test_hit_expectations_carry_objective_scoped_graphs(dataset):
 
 def test_evaluator_broken_and_miss_expectations():
     evaluator = InspectionF1()
-    for expected, match_key in (
-        (BrokenSnapshot(reason="challenge page"), "broken_match"),
-        (Miss(reason="no holders"), "miss_match"),
+    for expected in (
+        BrokenSnapshot(reason="challenge page"),
+        Miss(reason="no holders"),
     ):
         wrongs = (
             Miss(reason="nothing here"),
