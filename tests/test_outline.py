@@ -214,17 +214,33 @@ def test_media_types_multiple_resources() -> None:
     }
 
 
-def test_media_types_missing_mime_fails_loud() -> None:
-    har = {"log": {"entries": [har_entry("https://example.org/a", "storage/a", None)]}}
-    with pytest.raises(ValueError, match="lacks a mimeType"):
-        har_resource_media_types(har)
+@pytest.mark.parametrize("mime_type", [None, "", "  ", "x-unknown", "  X-UNKNOWN  "])
+def test_media_types_untyped_bodies_omitted(mime_type: str | None) -> None:
+    """Responses Chromium saw no Content-Type for are left out, not guessed."""
+    har = {
+        "log": {"entries": [har_entry("https://example.org/a", "storage/a", mime_type)]}
+    }
+    assert har_resource_media_types(har) == {}
+
+
+def test_media_types_untyped_beacon_among_typed_bodies() -> None:
+    """A tracker beacon's untyped body doesn't hide the page's real resources."""
+    har = {
+        "log": {
+            "entries": [
+                har_entry(
+                    "https://tracker.example.net/pview?u=1", "storage/t", "x-unknown"
+                ),
+                har_entry("https://example.org/a", "storage/a", "image/png"),
+            ]
+        }
+    }
+    assert har_resource_media_types(har) == {"storage/a": "image/png"}
 
 
 @pytest.mark.parametrize(
     "mime_type",
     [
-        "",
-        "  ",
         "imagejpeg",
         "image/;jpeg",
         "image/png/foo",

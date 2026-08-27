@@ -119,12 +119,17 @@ def har_resource_media_types(http_archive: dict | None) -> dict[str, str]:
     """Map each stored body path to its normalized response media type.
 
     Media types are lowercased and stripped of parameters and whitespace.
-    A stored body without a well-formed media type raises: guessing from the
-    file extension would silently mislabel content.
+    Bodies whose response carried no usable media type are omitted rather
+    than guessed at: third-party beacons routinely respond without a
+    Content-Type, which Chromium records as a missing or ``x-unknown``
+    mimeType. A structurally malformed mimeType still raises: that would
+    be a producer bug, not an untyped response.
     """
     media: dict[str, str] = {}
     for url, file, content in _stored_bodies(http_archive):
-        media[file] = _normalized_media_type(content.get("mimeType"), url)
+        media_type = _normalized_media_type(content.get("mimeType"), url)
+        if media_type is not None:
+            media[file] = media_type
     return media
 
 
@@ -139,10 +144,15 @@ def _stored_bodies(http_archive: dict | None) -> Iterator[tuple[str, str, dict]]
             yield entry["request"]["url"], file, content
 
 
-def _normalized_media_type(mime_type: str | None, url: str) -> str:
-    """Lowercase a media type, stripping parameters; fail if unusable."""
-    if not isinstance(mime_type, str):
-        raise ValueError(f"stored body for {url!r} lacks a mimeType")  # noqa: TRY004
+def _normalized_media_type(mime_type: str | None, url: str) -> str | None:
+    """Normalize a media type; ``None`` when the response type is unknown.
+
+    Missing, blank, and ``x-unknown`` mime types mean Chromium saw no
+    Content-Type on the response. Anything else that does not parse as
+    ``type/subtype`` raises.
+    """
+    if mime_type is None or mime_type.strip().lower() in ("", "x-unknown"):
+        return None
     media_type = mime_type.split(";", 1)[0].strip().lower()
     parts = media_type.split("/")
     if len(parts) != 2 or not all(part.split() == [part] for part in parts):
