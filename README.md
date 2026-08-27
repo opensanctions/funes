@@ -12,7 +12,7 @@ Inputs are CSV files with columns `objective,url`. Each file's stem names a **Da
 
 A worker run on a candidate captures an immutable Pravda **Snapshot** (plaintext, rendered HTML, HAR, screenshot) against a remote browser, Postgres, and an artifact store that Funes owns and runs. The run becomes an **Attempt** linking the candidate to the snapshot. Infra failures (exceptions) write no attempt; retrying them is Procrastinate's business, not a domain fact.
 
-Every completed attempt records exactly one **SnapshotAssessment** — the judgement of the snapshot itself: `usable` or `broken`. Snapshot usability is objective-independent. Broken is explicit and routed to a dormant repair queue the normal worker does not consume; brokenness is never attached to a URL, and it produces no inspection.
+Every completed attempt records exactly one **SnapshotAssessment** — the judgement of the snapshot itself: `usable` or `broken`. Snapshot usability is objective-independent. Broken is explicit and routed to a repair queue that the documented worker below does not consume (it listens on the process queue only); brokenness is never attached to a URL, and it produces no inspection.
 
 A usable assessment additionally gets exactly one objective-relative **Inspection**: `hit` (the objective is satisfied; extracted persons and their positions are attached) or `miss` (nothing on the page satisfies the objective, with a reason). Hits are revisited after an interval; misses are not normally retried.
 
@@ -36,7 +36,7 @@ One-shot commands run through the `funes` console script; the worker is Procrast
 ```bash
 uv run --env-file .env funes migrate  # apply schemas and import missing candidates
 uv run --env-file .env funes enqueue  # queue one job per due candidate (revisit interval, deduped)
-uv run --env-file .env procrastinate worker  # consume the process queue (-c/--concurrency N)
+uv run --env-file .env procrastinate worker --queues process  # consume the process queue (-c/--concurrency N); the repair queue stays pending
 ```
 
 Queued, running, and failed jobs live in the same Postgres database and are inspected with Procrastinate's own tooling:
