@@ -1,4 +1,4 @@
-"""LLM extraction schema, prompts, and Pydantic AI agent construction."""
+"""LLM extraction schema, prompts, and the Pydantic AI extraction agent."""
 
 import logging
 from collections.abc import Awaitable, Callable, Mapping
@@ -8,7 +8,6 @@ from typing import Annotated, Literal
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field, StringConstraints
 from pydantic_ai import Agent, BinaryContent, ModelRetry, RunContext
-from pydantic_ai.models import Model
 
 log = logging.getLogger("funes")
 
@@ -345,31 +344,22 @@ async def view_resource(
     return BinaryContent(data, media_type=media_type)
 
 
-def build_extraction_agent(
-    model: Model | str,
-) -> Agent[ExtractionDependencies, PageResult]:
-    """Build the reusable extraction agent for *model*.
-
-    Tool-based structured output into ``PageResult`` (a ``Hit``, a ``Miss``,
-    or a ``BrokenSnapshot``, discriminated by ``kind``). The agent's single tool,
-    ``view_resource``, lets the model view captured images referenced by body
-    paths in the DOM outline; callers must pass matching
-    ``ExtractionDependencies`` with every ``agent.run`` call.
-
-    *model* is either a full Pydantic AI model id (``provider:model``, e.g.
-    ``openai:gpt-5.6-luna`` or ``anthropic:claude-sonnet-4-6``) passed straight
-    through, so the provider is chosen by configuration, or an already-built
-    ``Model`` instance (e.g. a ``FunctionModel``/``TestModel`` in tests).
-    """
-    return Agent(
-        model,
-        name="extraction",
-        output_type=PageResult,
-        instructions=_EXTRACTION_INSTRUCTIONS,
-        model_settings={"thinking": "low"},
-        deps_type=ExtractionDependencies,
-        tools=[view_resource],
-    )
+# The one extraction agent for the whole application, reused across runs
+# like a FastAPI app. ``defer_model_check`` keeps this module free of any
+# model configuration: every run supplies *its* model — the worker passes
+# the model from worker configuration, evals pass --model, tests override
+# with ``TestModel``/``FunctionModel``. Tool-based structured output: each
+# member of the result union registers as its own output tool
+# (``final_result_Hit``, ``final_result_Miss``, ``final_result_BrokenSnapshot``).
+extraction_agent: Agent[ExtractionDependencies, PageResult] = Agent(
+    defer_model_check=True,
+    name="extraction",
+    output_type=[Hit, Miss, BrokenSnapshot],
+    instructions=_EXTRACTION_INSTRUCTIONS,
+    model_settings={"thinking": "low"},
+    deps_type=ExtractionDependencies,
+    tools=[view_resource],
+)
 
 
 def build_prompt(objective: str, metadata: PageMetadata, outline: str) -> str:

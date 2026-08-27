@@ -12,7 +12,7 @@ dependencies = [
     "opensanctions-pravda>=0.1.6",
     "procrastinate==3.9.0",
     "psycopg[binary]>=3.3.4",
-    "pydantic-ai-slim[openai]>=2.33,<3",
+    "pydantic-ai-slim[openai]>=2.34,<3",
     "sqlalchemy[asyncio]>=2.0.51",
 ]
 
@@ -20,7 +20,7 @@ dependencies = [
 dev = [
     "aiosqlite>=0.22.1",
     "pre-commit>=4.6.0",
-    "pydantic-evals>=2.34.0",
+    "pydantic-evals>=2.34,<3",
     "pytest>=9.1.1",
     "ruff>=0.15.16",
 ]

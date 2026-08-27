@@ -24,8 +24,8 @@ from funes.extract import (
     PageResult,
     Person,
     Position,
-    build_extraction_agent,
     build_prompt,
+    extraction_agent,
     metadata_from_html,
     view_resource,
 )
@@ -270,15 +270,7 @@ def test_view_resource_reads_through_dependencies():
 # view_resource tool wired exactly as the worker wires them ---
 
 
-def _extraction_agent():
-    # Every run below overrides the model, and ALLOW_MODEL_REQUESTS blocks
-    # real requests; construction only needs a syntactically present key.
-    return build_extraction_agent("openai:gpt-5")
-
-
 def test_agent_function_model_returns_hit_with_nested_graph():
-    agent = _extraction_agent()
-
     def fn(messages, info):
         return ModelResponse(
             parts=[
@@ -286,8 +278,8 @@ def test_agent_function_model_returns_hit_with_nested_graph():
             ]
         )
 
-    with agent.override(model=FunctionModel(fn)):
-        result = asyncio.run(agent.run("ignored prompt", deps=_deps({})))
+    with extraction_agent.override(model=FunctionModel(fn)):
+        result = asyncio.run(extraction_agent.run("ignored prompt", deps=_deps({})))
 
     assert isinstance(result.output, Hit)
     [returned] = result.output.persons
@@ -301,8 +293,6 @@ def test_agent_function_model_returns_hit_with_nested_graph():
 
 
 def test_agent_function_model_returns_miss():
-    agent = _extraction_agent()
-
     def fn(messages, info):
         return ModelResponse(
             parts=[
@@ -313,16 +303,14 @@ def test_agent_function_model_returns_miss():
             ]
         )
 
-    with agent.override(model=FunctionModel(fn)):
-        result = asyncio.run(agent.run("ignored prompt", deps=_deps({})))
+    with extraction_agent.override(model=FunctionModel(fn)):
+        result = asyncio.run(extraction_agent.run("ignored prompt", deps=_deps({})))
 
     assert isinstance(result.output, Miss)
     assert result.output.reason == "No officeholders; news article."
 
 
 def test_agent_function_model_returns_broken_snapshot():
-    agent = _extraction_agent()
-
     def fn(messages, info):
         return ModelResponse(
             parts=[
@@ -333,20 +321,19 @@ def test_agent_function_model_returns_broken_snapshot():
             ]
         )
 
-    with agent.override(model=FunctionModel(fn)):
-        result = asyncio.run(agent.run("ignored prompt", deps=_deps({})))
+    with extraction_agent.override(model=FunctionModel(fn)):
+        result = asyncio.run(extraction_agent.run("ignored prompt", deps=_deps({})))
 
     assert isinstance(result.output, BrokenSnapshot)
     assert result.output.reason == "Cloudflare challenge"
 
 
 def test_agent_test_model_views_resource_and_produces_valid_result():
-    agent = _extraction_agent()
     # TestModel generates 'a' for a string argument, so the media-type map
     # must carry that body path for the generated tool call to succeed.
     deps = _deps({"a": "image/png"}, b"\x89PNG-fake")
-    with agent.override(model=TestModel()):
-        result = asyncio.run(agent.run("ignored prompt", deps=deps))
+    with extraction_agent.override(model=TestModel()):
+        result = asyncio.run(extraction_agent.run("ignored prompt", deps=deps))
 
     # TestModel satisfies the schema with a minimal valid output; the run
     # must end in a member of the union, whichever member it picks.

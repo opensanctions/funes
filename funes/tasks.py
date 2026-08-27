@@ -21,8 +21,8 @@ from funes.extract import (
     ExtractionDependencies,
     Hit,
     Miss,
-    build_extraction_agent,
     build_prompt,
+    extraction_agent,
     metadata_from_html,
 )
 from funes.outline import build_outline, har_resource_media_types
@@ -125,9 +125,9 @@ async def inspect_candidate(candidate_id: str) -> None:
                 resource_media_types=har_resource_media_types(snapshot.http_archive),
             )
             log.info("%s → extracting …", snapshot.final_url)
-            agent = build_extraction_agent(model)
-            run = await agent.run(
+            run = await extraction_agent.run(
                 build_prompt(objective, metadata, outline),
+                model=model,
                 run_id=str(attempt_id),
                 deps=deps,
             )
@@ -135,7 +135,7 @@ async def inspect_candidate(candidate_id: str) -> None:
 
             if isinstance(run.output, BrokenSnapshot):
                 reason = run.output.reason
-                write_session(session_file, run.all_messages())
+                write_session(session_file, run.all_messages_json())
                 db.store_broken_attempt(
                     session,
                     attempt_id=attempt_id,
@@ -149,7 +149,7 @@ async def inspect_candidate(candidate_id: str) -> None:
                 log.info("%s → broken: %s", snapshot.final_url, reason)
                 return
 
-            write_session(session_file, run.all_messages())
+            write_session(session_file, run.all_messages_json())
             match run.output:
                 case Hit() as hit:
                     log.info(

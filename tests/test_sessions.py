@@ -20,7 +20,7 @@ def test_write_session_creates_directories_and_round_trips(tmp_path):
         ModelRequest(parts=[UserPromptPart(content="extract this page")]),
         ModelResponse(parts=[TextPart("done")], model_name="test"),
     ]
-    write_session(path, messages)
+    write_session(path, ModelMessagesTypeAdapter.dump_json(messages))
 
     restored = ModelMessagesTypeAdapter.validate_json(Path(path).read_bytes())
     assert restored == messages
@@ -42,7 +42,7 @@ def test_write_session_round_trips_binary_tool_returns(tmp_path):
             ]
         ),
     ]
-    write_session(path, messages)
+    write_session(path, ModelMessagesTypeAdapter.dump_json(messages))
 
     restored = ModelMessagesTypeAdapter.validate_json(Path(path).read_bytes())
     # Image content is restored as its BinaryImage specialization.

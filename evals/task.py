@@ -9,8 +9,8 @@ from evals.models import FixtureInput
 from funes.extract import (
     ExtractionDependencies,
     PageResult,
-    build_extraction_agent,
     build_prompt,
+    extraction_agent,
     metadata_from_html,
 )
 from funes.outline import build_outline, har_resource_media_types
@@ -43,8 +43,7 @@ async def extract(inputs: FixtureInput, model: Model | str) -> PageResult:
         read_resource=read_resource,
         resource_media_types=har_resource_media_types(har),
     )
-    agent = build_extraction_agent(model)
-    result = await agent.run(
-        build_prompt(inputs.objective, metadata, outline), deps=deps
+    result = await extraction_agent.run(
+        build_prompt(inputs.objective, metadata, outline), model=model, deps=deps
     )
     return result.output

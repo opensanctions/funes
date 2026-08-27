@@ -620,7 +620,7 @@ requires-dist = [
     { name = "opensanctions-pravda", specifier = ">=0.1.6" },
     { name = "procrastinate", specifier = "==3.9.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
-    { name = "pydantic-ai-slim", extras = ["openai"], specifier = ">=2.33,<3" },
+    { name = "pydantic-ai-slim", extras = ["openai"], specifier = ">=2.34,<3" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.51" },
 ]
 
@@ -628,7 +628,7 @@ requires-dist = [
 dev = [
     { name = "aiosqlite", specifier = ">=0.22.1" },
     { name = "pre-commit", specifier = ">=4.6.0" },
-    { name = "pydantic-evals", specifier = ">=2.34.0" },
+    { name = "pydantic-evals", specifier = ">=2.34,<3" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "ruff", specifier = ">=0.15.16" },
 ]
