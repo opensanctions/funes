@@ -1,6 +1,7 @@
 """Tests for the extraction schema, prompts, tools, and result union."""
 
 import asyncio
+import json
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
@@ -44,6 +45,16 @@ _PERSON = {
         {"name": "Chair", "organization": "Example Foundation"},
     ],
 }
+
+
+def _native_text(member: str, payload: dict) -> str:
+    """Serialize one PageResult member in the native-output union envelope.
+
+    Multi-type native output validates one combined schema: an outer
+    ``result`` object whose ``kind`` names the member class and whose ``data``
+    carries the member payload.
+    """
+    return json.dumps({"result": {"kind": member, "data": payload}})
 
 
 # --- union discrimination and validation ---
@@ -273,9 +284,7 @@ def test_view_resource_reads_through_dependencies():
 def test_agent_function_model_returns_hit_with_nested_graph():
     def fn(messages, info):
         return ModelResponse(
-            parts=[
-                ToolCallPart("final_result_Hit", {"kind": "hit", "persons": [_PERSON]})
-            ]
+            parts=[TextPart(_native_text("Hit", {"kind": "hit", "persons": [_PERSON]}))]
         )
 
     with extraction_agent.override(model=FunctionModel(fn)):
@@ -296,9 +305,11 @@ def test_agent_function_model_returns_miss():
     def fn(messages, info):
         return ModelResponse(
             parts=[
-                ToolCallPart(
-                    "final_result_Miss",
-                    {"kind": "miss", "reason": "No officeholders; news article."},
+                TextPart(
+                    _native_text(
+                        "Miss",
+                        {"kind": "miss", "reason": "No officeholders; news article."},
+                    )
                 )
             ]
         )
@@ -314,9 +325,11 @@ def test_agent_function_model_returns_broken_snapshot():
     def fn(messages, info):
         return ModelResponse(
             parts=[
-                ToolCallPart(
-                    "final_result_BrokenSnapshot",
-                    {"kind": "broken", "reason": "Cloudflare challenge"},
+                TextPart(
+                    _native_text(
+                        "BrokenSnapshot",
+                        {"kind": "broken", "reason": "Cloudflare challenge"},
+                    )
                 )
             ]
         )
@@ -330,14 +343,22 @@ def test_agent_function_model_returns_broken_snapshot():
 
 def test_agent_test_model_views_resource_and_produces_valid_result():
     # TestModel generates 'a' for a string argument, so the media-type map
-    # must carry that body path for the generated tool call to succeed.
+    # must carry that body path for the generated tool call to succeed. Its
+    # default profile claims no native JSON-schema support and its generated
+    # text would not satisfy the schema, so hand it a valid union payload
+    # (miss: this stub does not model real page content) as the final text.
     deps = _deps({"a": "image/png"}, b"\x89PNG-fake")
-    with extraction_agent.override(model=TestModel()):
+    test_model = TestModel(
+        profile={"supports_json_schema_output": True},
+        custom_output_text=_native_text(
+            "Miss", {"kind": "miss", "reason": "No officeholders on the page."}
+        ),
+    )
+    with extraction_agent.override(model=test_model):
         result = asyncio.run(extraction_agent.run("ignored prompt", deps=deps))
 
-    # TestModel satisfies the schema with a minimal valid output; the run
-    # must end in a member of the union, whichever member it picks.
-    assert isinstance(result.output, (Hit, Miss, BrokenSnapshot))
+    assert isinstance(result.output, Miss)
+    assert result.output.reason == "No officeholders on the page."
     parts = _tool_return_part(result)
     [call] = [
         p

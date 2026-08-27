@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field, StringConstraints
-from pydantic_ai import Agent, BinaryContent, ModelRetry, RunContext
+from pydantic_ai import Agent, BinaryContent, ModelRetry, NativeOutput, RunContext
 
 log = logging.getLogger("funes")
 
@@ -348,13 +348,17 @@ async def view_resource(
 # like a FastAPI app. ``defer_model_check`` keeps this module free of any
 # model configuration: every run supplies *its* model — the worker passes
 # the model from worker configuration, evals pass --model, tests override
-# with ``TestModel``/``FunctionModel``. Tool-based structured output: each
-# member of the result union registers as its own output tool
-# (``final_result_Hit``, ``final_result_Miss``, ``final_result_BrokenSnapshot``).
+# with ``TestModel``/``FunctionModel``. Native structured output compiles the
+# result union to one provider-enforced JSON schema (``response_format`` on
+# OpenAI). Strict mode constrains the response to the provider-compatible
+# schema; Pydantic still performs final validation and may retry constraints
+# that the provider schema cannot express.
 extraction_agent: Agent[ExtractionDependencies, PageResult] = Agent(
     defer_model_check=True,
     name="extraction",
-    output_type=[Hit, Miss, BrokenSnapshot],
+    output_type=NativeOutput(
+        [Hit, Miss, BrokenSnapshot], name="page_result", strict=True
+    ),
     instructions=_EXTRACTION_INSTRUCTIONS,
     model_settings={"thinking": "low"},
     deps_type=ExtractionDependencies,

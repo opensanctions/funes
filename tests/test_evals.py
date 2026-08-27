@@ -3,10 +3,11 @@ and the eval task's prompt API. No model requests are made: the eval task runs
 against a pydantic-ai FunctionModel that captures the prompt."""
 
 import asyncio
+import json
 from types import NoneType
 
 import pytest
-from pydantic_ai.messages import ModelResponse, ToolCallPart
+from pydantic_ai.messages import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_evals import Dataset
 from pydantic_evals.evaluators import EvaluatorContext
@@ -160,7 +161,16 @@ def test_extract_builds_objective_scoped_prompt():
         captured["prompt"] = messages[-1].parts[0].content
         return ModelResponse(
             parts=[
-                ToolCallPart("final_result_Miss", {"kind": "miss", "reason": "stubbed"})
+                TextPart(
+                    json.dumps(
+                        {
+                            "result": {
+                                "kind": "Miss",
+                                "data": {"kind": "miss", "reason": "stubbed"},
+                            }
+                        }
+                    )
+                )
             ]
         )
 
