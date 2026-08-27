@@ -1,4 +1,4 @@
-"""Durable page catalogue and inspection-ledger persistence."""
+"""Normalized objective/url candidate and attempt persistence."""
 
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -24,54 +24,42 @@ from sqlalchemy.orm import (
     Mapped,
     mapped_column,
     relationship,
+    selectinload,
 )
 
-# The Pydantic structured-output result from funes.extract, aliased to
-# avoid colliding with the ORM Inspection model below.
-from funes.extract import Extraction as ExtractionResult
+from funes.extract import Hit, Miss
 
 
-class Outcome(StrEnum):
-    """Terminal outcome of one pipeline run over a page.
+class SnapshotStatus(StrEnum):
+    """Terminal assessment of a captured Pravda snapshot.
 
-    - productive: captured + extracted, at least one person. Graph persisted.
-    - empty: captured + extracted cleanly, zero persons. No graph.
-    - broken: no inspectable result. ``reason`` is set; ``model`` and
-      ``extracted_at`` are NULL when the model never ran (broken at
-      capture), and ``model`` is set when the model itself concluded the
-      page is broken. Infra crashes (exceptions) write no row at all —
-      retrying them is Procrastinate's business, not a page fact.
+    - usable: the snapshot is a usable source; an Inspection follows.
+    - broken: the snapshot is unusable. ``reason`` is required; ``model``
+      is null only when deterministic checks rejected the snapshot before
+      the model ran.
     """
 
-    PRODUCTIVE = "productive"
-    EMPTY = "empty"
+    USABLE = "usable"
     BROKEN = "broken"
+
+
+class InspectionOutcome(StrEnum):
+    """Terminal judgement of a usable snapshot against an objective.
+
+    - hit: the objective is satisfied; extracted people are attached.
+    - miss: nothing satisfies the objective; ``reason`` explains why.
+    """
+
+    HIT = "hit"
+    MISS = "miss"
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
 
 
 class Base(DeclarativeBase):
     pass
-
-
-class Page(Base):
-    """One durable web page, identified by URL, with its datasets and organizations."""
-
-    __tablename__ = "page"
-
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    url: Mapped[str] = mapped_column(Text, unique=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
-    )
-
-    organizations: Mapped[list["PageOrganization"]] = relationship(
-        back_populates="page", cascade="all, delete-orphan"
-    )
-    datasets: Mapped[list["PageDataset"]] = relationship(
-        back_populates="page", cascade="all, delete-orphan"
-    )
-    inspections: Mapped[list["Inspection"]] = relationship(
-        back_populates="page", cascade="all, delete-orphan"
-    )
 
 
 class Dataset(Base):
@@ -81,69 +69,135 @@ class Dataset(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(Text, unique=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
-    pages: Mapped[list["PageDataset"]] = relationship(
+    objectives: Mapped[list["Objective"]] = relationship(
         back_populates="dataset", cascade="all, delete-orphan"
     )
 
 
-class PageDataset(Base):
-    """Membership of a page in a dataset."""
+class Objective(Base):
+    """What a dataset wants to learn from pages, owned by one dataset."""
 
-    __tablename__ = "page_dataset"
-    __table_args__ = (UniqueConstraint("page_id", "dataset_id"),)
+    __tablename__ = "objective"
+    __table_args__ = (UniqueConstraint("dataset_id", "description"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    page_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("page.id", ondelete="CASCADE")
-    )
     dataset_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("dataset.id", ondelete="CASCADE")
     )
+    description: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
-    page: Mapped[Page] = relationship(back_populates="datasets")
-    dataset: Mapped[Dataset] = relationship(back_populates="pages")
+    dataset: Mapped[Dataset] = relationship(back_populates="objectives")
+    candidates: Mapped[list["Candidate"]] = relationship(
+        back_populates="objective", cascade="all, delete-orphan"
+    )
 
 
-class PageOrganization(Base):
-    """One organization associated with a page."""
+class Url(Base):
+    """Objective-independent URL identity for snapshot capture."""
 
-    __tablename__ = "page_organization"
-    __table_args__ = (UniqueConstraint("page_id", "organization"),)
+    __tablename__ = "url"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    page_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("page.id", ondelete="CASCADE")
-    )
-    organization: Mapped[str] = mapped_column(Text)
+    url: Mapped[str] = mapped_column(Text, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
-    page: Mapped[Page] = relationship(back_populates="organizations")
+    candidates: Mapped[list["Candidate"]] = relationship(
+        back_populates="url", cascade="all, delete-orphan"
+    )
+
+
+class Candidate(Base):
+    """The objective ↔ url relation: one unit of work for the pipeline."""
+
+    __tablename__ = "candidate"
+    __table_args__ = (UniqueConstraint("objective_id", "url_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    objective_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("objective.id", ondelete="CASCADE")
+    )
+    url_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("url.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    objective: Mapped[Objective] = relationship(back_populates="candidates")
+    url: Mapped[Url] = relationship(back_populates="candidates")
+    attempts: Mapped[list["Attempt"]] = relationship(
+        back_populates="candidate", cascade="all, delete-orphan"
+    )
+
+
+class Attempt(Base):
+    """One completed domain run connecting a candidate to a Pravda snapshot.
+
+    The snapshot stays a logical UUID reference into Pravda's own storage;
+    infra failures (exceptions) create no row.
+    """
+
+    __tablename__ = "attempt"
+    __table_args__ = (
+        Index("ix_attempt_candidate_created", "candidate_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("candidate.id", ondelete="CASCADE")
+    )
+    snapshot_id: Mapped[uuid.UUID] = mapped_column(unique=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    candidate: Mapped[Candidate] = relationship(back_populates="attempts")
+    assessment: Mapped["SnapshotAssessment | None"] = relationship(
+        back_populates="attempt",
+        primaryjoin="Attempt.snapshot_id == SnapshotAssessment.snapshot_id",
+        foreign_keys="SnapshotAssessment.snapshot_id",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    inspection: Mapped["Inspection | None"] = relationship(
+        back_populates="attempt", uselist=False, cascade="all, delete-orphan"
+    )
+
+
+class SnapshotAssessment(Base):
+    """Terminal assessment of one snapshot, keyed by its snapshot id."""
+
+    __tablename__ = "snapshot_assessment"
+
+    snapshot_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("attempt.snapshot_id", ondelete="CASCADE"), primary_key=True
+    )
+    status: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(Text)
+    model: Mapped[str | None] = mapped_column(Text)
+    assessed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    attempt: Mapped[Attempt] = relationship(
+        back_populates="assessment",
+        primaryjoin="Attempt.snapshot_id == SnapshotAssessment.snapshot_id",
+        foreign_keys=[snapshot_id],
+        uselist=False,
+    )
 
 
 class Inspection(Base):
-    """One terminal outcome of a pipeline run over a page."""
+    """The judgement of a usable snapshot against one objective."""
 
     __tablename__ = "inspection"
-    __table_args__ = (Index("ix_inspection_page_created", "page_id", "created_at"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    page_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("page.id", ondelete="CASCADE")
+    attempt_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("attempt.id", ondelete="CASCADE"), unique=True
     )
-    snapshot_id: Mapped[uuid.UUID]
     outcome: Mapped[str] = mapped_column(Text)
     reason: Mapped[str | None] = mapped_column(Text)
-    model: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
-    )
-    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    extracted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    model: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
-    page: Mapped[Page] = relationship(back_populates="inspections")
+    attempt: Mapped[Attempt] = relationship(back_populates="inspection")
     persons: Mapped[list["Person"]] = relationship(
         back_populates="inspection", cascade="all, delete-orphan"
     )
@@ -204,189 +258,295 @@ def _upsert_insert(session: AsyncSession):
             raise ValueError(f"unsupported dialect: {dialect!r}")
 
 
-async def import_pages(session: AsyncSession, rows: list[tuple[str, str, str]]) -> None:
-    """Append-only import of (dataset, url, organization) rows into the catalogue.
+async def import_candidates(
+    session: AsyncSession, rows: list[tuple[str, str, str]]
+) -> None:
+    """Append-only import of ``(dataset, objective, url)`` rows.
 
-    Creates missing datasets, pages, and dataset/page-organization
-    associations; existing rows are left untouched (insert-on-conflict does
-    nothing). No updates or deletes are ever performed.
+    Creates missing datasets, objectives, urls, and candidates; existing
+    rows are left untouched (insert-on-conflict does nothing). No updates
+    or deletes are ever performed.
     """
-    urls = list(dict.fromkeys(url for _, url, _ in rows))
-    if not urls:
+    if not rows:
         return
     insert = _upsert_insert(session)
     names = list(dict.fromkeys(dataset for dataset, _, _ in rows))
-    memberships = sorted({(dataset, url) for dataset, url, _ in rows})
+    descriptions = list(dict.fromkeys(objective for _, objective, _ in rows))
+    urls = list(dict.fromkeys(url for _, _, url in rows))
     await session.execute(
         insert(Dataset)
         .values([{Dataset.name: name} for name in names])
         .on_conflict_do_nothing(index_elements=[Dataset.name])
     )
     await session.execute(
-        insert(Page)
-        .values([{Page.url: url} for url in urls])
-        .on_conflict_do_nothing(index_elements=[Page.url])
+        insert(Url)
+        .values([{Url.url: url} for url in urls])
+        .on_conflict_do_nothing(index_elements=[Url.url])
     )
-    # Map url/dataset name -> id for association inserts.
-    id_by_url = dict(
-        (
-            await session.execute(select(Page.url, Page.id).where(Page.url.in_(urls)))
-        ).all()
-    )
-    id_by_name = dict(
+    dataset_id_by_name = dict(
         (
             await session.execute(
                 select(Dataset.name, Dataset.id).where(Dataset.name.in_(names))
             )
         ).all()
     )
-    associations = [
-        {PageOrganization.page_id: id_by_url[url], PageOrganization.organization: org}
-        for _, url, org in rows
-        if org
-    ]
-    if associations:
+    url_id_by_url = dict(
+        (await session.execute(select(Url.url, Url.id).where(Url.url.in_(urls)))).all()
+    )
+    objective_id_by_key = {
+        (dataset_id, description): objective_id
+        for dataset_id, description, objective_id in (
+            await session.execute(
+                select(Objective.dataset_id, Objective.description, Objective.id).where(
+                    Objective.description.in_(descriptions)
+                )
+            )
+        ).all()
+    }
+    missing_objectives = {
+        (dataset_id_by_name[dataset], description)
+        for dataset, description, _ in rows
+        if (dataset_id_by_name[dataset], description) not in objective_id_by_key
+    }
+    if missing_objectives:
         await session.execute(
-            insert(PageOrganization)
-            .values(associations)
+            insert(Objective)
+            .values(
+                [
+                    {
+                        Objective.dataset_id: dataset_id,
+                        Objective.description: description,
+                    }
+                    for dataset_id, description in sorted(missing_objectives)
+                ]
+            )
             .on_conflict_do_nothing(
-                index_elements=[PageOrganization.page_id, PageOrganization.organization]
+                index_elements=[Objective.dataset_id, Objective.description]
             )
         )
+        objective_id_by_key.update(
+            {
+                (dataset_id, description): objective_id
+                for dataset_id, description, objective_id in (
+                    await session.execute(
+                        select(
+                            Objective.dataset_id,
+                            Objective.description,
+                            Objective.id,
+                        ).where(Objective.description.in_(descriptions))
+                    )
+                ).all()
+            }
+        )
     await session.execute(
-        insert(PageDataset)
+        insert(Candidate)
         .values(
             [
                 {
-                    PageDataset.page_id: id_by_url[url],
-                    PageDataset.dataset_id: id_by_name[dataset],
+                    Candidate.objective_id: objective_id_by_key[
+                        (dataset_id_by_name[dataset], description)
+                    ],
+                    Candidate.url_id: url_id_by_url[url],
                 }
-                for dataset, url in memberships
+                for dataset, description, url in rows
             ]
         )
         .on_conflict_do_nothing(
-            index_elements=[PageDataset.page_id, PageDataset.dataset_id]
+            index_elements=[Candidate.objective_id, Candidate.url_id]
         )
     )
 
 
-async def select_pages(session: AsyncSession) -> list[Page]:
-    """Return all catalogue pages."""
-    result = await session.execute(select(Page).order_by(Page.url))
-    return list(result.scalars().all())
+async def select_candidates(session: AsyncSession) -> list[Candidate]:
+    """Return all candidates in deterministic order.
 
-
-async def select_due_pages(
-    session: AsyncSession, revisit_interval: timedelta
-) -> list[Page]:
-    """Return pages due for a new pipeline run, ordered by URL.
-
-    A page is due iff (a) it has no inspections (never attempted), or
-    (b) its latest inspection (by created_at) is productive and older than
-    ``revisit_interval``. Empty and broken latest verdicts make a page not
-    due.
+    Ordered by dataset name, objective description, then url, so callers
+    (enqueueing, tests) see a stable sequence regardless of insert order.
+    Related objective (with its dataset) and url are eagerly loaded; the
+    attempt history is deliberately not loaded, so queueing never pulls
+    an unbounded inspection history.
     """
-    latest_created_at = (
-        select(
-            Inspection.page_id.label("page_id"),
-            func.max(Inspection.created_at).label("created_at"),
-        )
-        .group_by(Inspection.page_id)
-        .subquery()
-    )
-    latest = (
-        select(Inspection.page_id, Inspection.outcome, Inspection.created_at)
-        .join(
-            latest_created_at,
-            (Inspection.page_id == latest_created_at.c.page_id)
-            & (Inspection.created_at == latest_created_at.c.created_at),
-        )
-        .subquery()
-    )
-    cutoff = datetime.now(UTC) - revisit_interval
     stmt = (
-        select(Page)
-        .outerjoin(latest, latest.c.page_id == Page.id)
-        .where(
-            or_(
-                latest.c.page_id.is_(None),
-                (latest.c.outcome == Outcome.PRODUCTIVE)
-                & (latest.c.created_at < cutoff),
-            )
+        select(Candidate)
+        .options(
+            selectinload(Candidate.objective).selectinload(Objective.dataset),
+            selectinload(Candidate.url),
         )
-        .order_by(Page.url)
+        .join(Objective, Objective.id == Candidate.objective_id)
+        .join(Dataset, Dataset.id == Objective.dataset_id)
+        .join(Url, Url.id == Candidate.url_id)
+        .order_by(Dataset.name, Objective.description, Url.url)
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
 
+async def select_due_candidates(
+    session: AsyncSession, revisit_interval: timedelta
+) -> list[Candidate]:
+    """Return candidates due for a new run, in deterministic order.
+
+    A candidate is due iff it has no attempt, or its latest attempt (by
+    created_at, ties broken by id) carries a HIT inspection and is older
+    than ``revisit_interval``. A latest MISS inspection or BROKEN
+    assessment blocks the normal queue; broken snapshots are the repair
+    path's business, not this one.
+    """
+    # Deterministic latest attempt per candidate: newest created_at wins,
+    # ties broken by the greater id.
+    ranked = select(
+        Attempt.candidate_id.label("candidate_id"),
+        Attempt.id.label("attempt_id"),
+        Attempt.created_at.label("created_at"),
+        func.row_number()
+        .over(
+            partition_by=Attempt.candidate_id,
+            order_by=(Attempt.created_at.desc(), Attempt.id.desc()),
+        )
+        .label("rank"),
+    ).subquery()
+    latest = (
+        select(ranked.c.candidate_id, ranked.c.attempt_id, ranked.c.created_at)
+        .where(ranked.c.rank == 1)
+        .subquery()
+    )
+    cutoff = _now() - revisit_interval
+    stmt = (
+        select(Candidate)
+        .options(
+            selectinload(Candidate.objective).selectinload(Objective.dataset),
+            selectinload(Candidate.url),
+        )
+        .join(Objective, Objective.id == Candidate.objective_id)
+        .join(Dataset, Dataset.id == Objective.dataset_id)
+        .join(Url, Url.id == Candidate.url_id)
+        .outerjoin(latest, latest.c.candidate_id == Candidate.id)
+        .where(
+            or_(
+                latest.c.candidate_id.is_(None),
+                (latest.c.created_at < cutoff)
+                & latest.c.attempt_id.in_(
+                    select(Inspection.attempt_id).where(
+                        Inspection.outcome == InspectionOutcome.HIT
+                    )
+                ),
+            )
+        )
+        .order_by(Dataset.name, Objective.description, Url.url)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+def store_broken_attempt(
+    session: AsyncSession,
+    *,
+    attempt_id: uuid.UUID,
+    candidate_id: uuid.UUID,
+    snapshot: Snapshot,
+    reason: str,
+    model: str | None = None,
+) -> Attempt:
+    """Construct one terminal broken-snapshot aggregate and add it.
+
+    Creates the Attempt (with the caller-allocated ``attempt_id`` — the
+    Pydantic run/session id and repair routing id) and its BROKEN
+    SnapshotAssessment; no Inspection or person graph. ``reason`` is
+    required; ``model`` is set only when the model itself concluded the
+    snapshot is broken.
+    """
+    if not reason or not reason.strip():
+        raise ValueError("broken attempt requires a non-blank reason")
+    now = _now()
+    attempt = Attempt(
+        id=attempt_id,
+        candidate_id=candidate_id,
+        snapshot_id=snapshot.id,
+        captured_at=snapshot.captured_at,
+        created_at=now,
+    )
+    attempt.assessment = SnapshotAssessment(
+        snapshot_id=snapshot.id,
+        status=SnapshotStatus.BROKEN,
+        reason=reason,
+        model=model,
+        assessed_at=now,
+    )
+    session.add(attempt)
+    return attempt
+
+
 def store_inspection(
     session: AsyncSession,
     *,
-    inspection_id: uuid.UUID,
-    page_id: uuid.UUID,
+    attempt_id: uuid.UUID,
+    candidate_id: uuid.UUID,
     snapshot: Snapshot,
-    outcome: Outcome,
-    model: str | None = None,
-    reason: str | None = None,
-    result: ExtractionResult | None = None,
+    result: Hit | Miss,
+    model: str,
 ) -> Inspection:
-    """Construct and persist one terminal pipeline outcome.
+    """Construct one terminal Hit/Miss model-result aggregate and add it.
 
-    Productive/empty outcomes require ``model`` and ``result`` (the graph is
-    mapped from ``result``) and forbid ``reason``; broken outcomes require
-    ``reason``, forbid ``result``, and set ``model`` iff the model ran.
+    Creates the Attempt (with the caller-allocated ``attempt_id``), its
+    USABLE SnapshotAssessment, and the Inspection. A Hit maps the
+    person/position graph and must not carry a reason; a Miss carries its
+    reason and no people. ``model`` is required. Unknown result types
+    (including BrokenSnapshot) are rejected.
     """
-    if outcome in (Outcome.PRODUCTIVE, Outcome.EMPTY):
-        if model is None:
-            raise ValueError(f"{outcome} outcome requires a model")
-        if result is None:
-            raise ValueError(f"{outcome} outcome requires a result")
-        if reason is not None:
-            raise ValueError(f"{outcome} outcome must not set a reason")
-        extracted_at: datetime | None = datetime.now(UTC)
-    elif outcome is Outcome.BROKEN:
-        if reason is None:
-            raise ValueError("broken outcome requires a reason")
-        if result is not None:
-            raise ValueError("broken outcome must not set a result")
-        extracted_at = None
-    else:
-        raise ValueError(f"unknown outcome: {outcome!r}")
-
-    inspection = Inspection(
-        id=inspection_id,
-        page_id=page_id,
+    if not model or not model.strip():
+        raise ValueError("inspection requires a model")
+    now = _now()
+    match result:
+        case Hit():
+            outcome = InspectionOutcome.HIT
+            reason = None
+            persons = [
+                Person(
+                    name=person.name,
+                    dob=person.dob,
+                    bio=person.bio,
+                    countries=person.countries,
+                    positions=[
+                        Position(
+                            name=position.name,
+                            organization=position.organization,
+                            description=position.description,
+                            jurisdiction=position.jurisdiction,
+                            start_date=position.start_date,
+                            end_date=position.end_date,
+                        )
+                        for position in person.positions
+                    ],
+                )
+                for person in result.persons
+            ]
+        case Miss():
+            outcome = InspectionOutcome.MISS
+            reason = result.reason
+            persons = []
+        case other:
+            raise ValueError(f"unknown result type: {type(other).__name__}")
+    attempt = Attempt(
+        id=attempt_id,
+        candidate_id=candidate_id,
         snapshot_id=snapshot.id,
+        captured_at=snapshot.captured_at,
+        created_at=now,
+    )
+    attempt.assessment = SnapshotAssessment(
+        snapshot_id=snapshot.id,
+        status=SnapshotStatus.USABLE,
+        reason=None,
+        model=model,
+        assessed_at=now,
+    )
+    inspection = Inspection(
+        attempt=attempt,
         outcome=outcome,
         reason=reason,
         model=model,
-        captured_at=snapshot.captured_at,
-        extracted_at=extracted_at,
+        created_at=now,
+        persons=persons,
     )
-    persons: list[Person] = []
-    if result is not None:
-        persons = [
-            Person(
-                inspection_id=inspection_id,
-                name=person.name,
-                dob=person.dob,
-                bio=person.bio,
-                countries=person.countries,
-                positions=[
-                    Position(
-                        name=position.name,
-                        organization=position.organization,
-                        description=position.description,
-                        jurisdiction=position.jurisdiction,
-                        start_date=position.start_date,
-                        end_date=position.end_date,
-                    )
-                    for position in person.positions
-                ],
-            )
-            for person in result.persons
-        ]
-    inspection.persons = persons
-    session.add(inspection)
+    session.add(attempt)
     return inspection
