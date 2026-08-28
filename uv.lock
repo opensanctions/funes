@@ -599,6 +599,7 @@ dependencies = [
     { name = "procrastinate" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-ai-slim", extra = ["openai"] },
+    { name = "pyyaml" },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 
@@ -621,6 +622,7 @@ requires-dist = [
     { name = "procrastinate", specifier = "==3.9.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
     { name = "pydantic-ai-slim", extras = ["openai"], specifier = ">=2.34,<3" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.51" },
 ]
 

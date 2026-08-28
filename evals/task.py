@@ -45,10 +45,13 @@ async def extract(inputs: FixtureInput, model: Model | str) -> PageResult:
         return resource_path.read_bytes()
 
     deps = ExtractionDependencies(
+        people_sought=inputs.people_sought,
+        subject_label=inputs.subject_label,
+        subject=inputs.subject,
         read_resource=read_resource,
         resource_media_types=har_resource_media_types(har),
     )
     result = await extraction_agent.run(
-        build_prompt(inputs.objective, metadata, outline), model=model, deps=deps
+        build_prompt(metadata, outline), model=model, deps=deps
     )
     return result.output

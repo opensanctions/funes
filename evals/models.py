@@ -1,14 +1,28 @@
 """Case input types for the inspection eval suite."""
 
-from pydantic import BaseModel
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, StringConstraints
+
+_NonBlank = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class FixtureInput(BaseModel):
-    """One frozen capture and the objective inspected against it."""
+    """One frozen capture and the inspection brief judged against it.
 
-    fixture: str
-    url: str
-    objective: str
+    ``people_sought`` names the class of position holders; ``subject``
+    scopes the search; ``subject_label`` names the subject's role in this
+    dataset. Together they render the runtime brief exactly as the worker
+    builds it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    fixture: _NonBlank
+    url: _NonBlank
+    people_sought: _NonBlank
+    subject_label: _NonBlank
+    subject: _NonBlank
     final_url: str | None = None
     http_status: int | None = 200
     capture_error: str | None = None

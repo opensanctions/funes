@@ -18,13 +18,13 @@ from funes.db import (
     Dataset,
     Inspection,
     InspectionOutcome,
-    Objective,
     Person,
     Position,
     SnapshotAssessment,
     SnapshotStatus,
+    Subject,
     Url,
-    import_candidates,
+    import_catalogue,
     select_due_candidates,
     store_broken_attempt,
     store_inspection,
@@ -32,6 +32,7 @@ from funes.db import (
 from funes.extract import Hit, Miss
 from funes.extract import Person as PersonResult
 from funes.extract import Position as PositionResult
+from funes.sources import DatasetDefinition, SubjectDefinition
 
 
 class FakeSession:
@@ -46,6 +47,23 @@ class FakeSession:
 
 def make_snapshot() -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), captured_at=datetime.now(UTC))
+
+
+def make_definition(
+    name: str,
+    people_sought: str,
+    subject_label: str,
+    subjects: dict[str, list[str]],
+) -> DatasetDefinition:
+    return DatasetDefinition(
+        name=name,
+        people_sought=people_sought,
+        subject_label=subject_label,
+        subjects=[
+            SubjectDefinition(name=subject, urls=urls)
+            for subject, urls in subjects.items()
+        ],
+    )
 
 
 def make_hit() -> Hit:
@@ -67,20 +85,34 @@ def make_hit() -> Hit:
     )
 
 
-# --- import_candidates: append-only catalogue import against in-memory SQLite ---
+# --- import_catalogue: append-only catalogue import against in-memory SQLite ---
 
 
-def test_import_candidates_creates_full_catalogue():
-    """One objective with several URLs, and one URL under two objectives."""
+def test_import_catalogue_creates_full_catalogue():
+    """One subject with several URLs, and one URL under two subjects."""
 
     def run() -> dict[str, list]:
         async def scenario(session: AsyncSession) -> dict[str, list]:
-            await import_candidates(
+            await import_catalogue(
                 session,
                 [
-                    ("one", "find board members", "https://a.example"),
-                    ("one", "find board members", "https://b.example"),
-                    ("two", "find legislators", "https://a.example"),
+                    make_definition(
+                        "one",
+                        "Board members",
+                        "Organization",
+                        {
+                            "Example Foundation": [
+                                "https://a.example",
+                                "https://b.example",
+                            ]
+                        },
+                    ),
+                    make_definition(
+                        "two",
+                        "Legislators",
+                        "Sending country",
+                        {"France": ["https://a.example"]},
+                    ),
                 ],
             )
             await session.commit()
@@ -91,19 +123,19 @@ def test_import_candidates_creates_full_catalogue():
             )
             rows = (
                 await session.execute(
-                    select(Dataset.name, Objective.description, Url.url)
-                    .join(Objective, Objective.dataset_id == Dataset.id)
-                    .join(Candidate, Candidate.objective_id == Objective.id)
+                    select(Dataset.name, Subject.name, Url.url)
+                    .join(Subject, Subject.dataset_id == Dataset.id)
+                    .join(Candidate, Candidate.subject_id == Subject.id)
                     .join(Url, Url.id == Candidate.url_id)
-                    .order_by(Dataset.name, Objective.description, Url.url)
+                    .order_by(Dataset.name, Subject.name, Url.url)
                 )
             ).all()
-            objective_counts = (
+            subject_counts = (
                 (
                     await session.execute(
                         select(func.count())
-                        .select_from(Objective)
-                        .group_by(Objective.dataset_id)
+                        .select_from(Subject)
+                        .group_by(Subject.dataset_id)
                         .order_by(func.count())
                     )
                 )
@@ -113,31 +145,41 @@ def test_import_candidates_creates_full_catalogue():
             return {
                 "datasets": list(datasets),
                 "rows": rows,
-                "objective_counts": list(objective_counts),
+                "subject_counts": list(subject_counts),
             }
 
         return asyncio.run(run_with_session(scenario))
 
     assert run() == {
         "datasets": ["one", "two"],
-        # One url row shared by both objectives; one candidate per pairing.
+        # One url row shared by both subjects; one candidate per pairing.
         "rows": [
-            ("one", "find board members", "https://a.example"),
-            ("one", "find board members", "https://b.example"),
-            ("two", "find legislators", "https://a.example"),
+            ("one", "Example Foundation", "https://a.example"),
+            ("one", "Example Foundation", "https://b.example"),
+            ("two", "France", "https://a.example"),
         ],
-        # Dataset one owns one objective covering both urls; dataset two owns one.
-        "objective_counts": [1, 1],
+        # Dataset one owns one subject covering both urls; dataset two owns one.
+        "subject_counts": [1, 1],
     }
 
 
-def test_import_candidates_is_idempotent():
-    """Re-importing identical rows changes nothing."""
+def test_import_catalogue_is_idempotent():
+    """Re-importing identical definitions changes nothing."""
 
     def run() -> tuple[int, int, int, int]:
-        rows = [
-            ("one", "find board members", "https://a.example"),
-            ("two", "find legislators", "https://a.example"),
+        definitions = [
+            make_definition(
+                "one",
+                "Board members",
+                "Organization",
+                {"Example Foundation": ["https://a.example"]},
+            ),
+            make_definition(
+                "two",
+                "Legislators",
+                "Sending country",
+                {"France": ["https://a.example"]},
+            ),
         ]
 
         async def scenario(session: AsyncSession) -> tuple[int, int, int, int]:
@@ -146,12 +188,12 @@ def test_import_candidates_is_idempotent():
                     await session.execute(select(func.count()).select_from(table))
                 ).scalar_one()
 
-            await import_candidates(session, rows)
+            await import_catalogue(session, definitions)
             await session.commit()
-            await import_candidates(session, rows)
+            await import_catalogue(session, definitions)
             await session.commit()
             return (
-                await count(Objective),
+                await count(Subject),
                 await count(Url),
                 await count(Candidate),
                 await count(Dataset),
@@ -160,6 +202,42 @@ def test_import_candidates_is_idempotent():
         return asyncio.run(run_with_session(scenario))
 
     assert run() == (2, 1, 2, 2)
+
+
+def test_import_catalogue_allows_subjects_without_seed_urls():
+    async def scenario(session: AsyncSession) -> tuple[int, int, int]:
+        await import_catalogue(
+            session,
+            [
+                make_definition(
+                    "courts", "Judges", "Court", {"High Court of Australia": []}
+                )
+            ],
+        )
+        await session.commit()
+        return (
+            (
+                await session.execute(select(func.count()).select_from(Subject))
+            ).scalar_one(),
+            (await session.execute(select(func.count()).select_from(Url))).scalar_one(),
+            (
+                await session.execute(select(func.count()).select_from(Candidate))
+            ).scalar_one(),
+        )
+
+    assert asyncio.run(run_with_session(scenario)) == (1, 0, 0)
+
+
+def test_import_catalogue_rejects_dataset_semantic_drift():
+    async def scenario(session: AsyncSession) -> None:
+        configured = make_definition("one", "Heads", "Organization", {})
+        await import_catalogue(session, [configured])
+        await session.commit()
+        changed = configured.model_copy(update={"people_sought": "Board members"})
+        with pytest.raises(ValueError, match="resolve the drift explicitly"):
+            await import_catalogue(session, [changed])
+
+    asyncio.run(run_with_session(scenario))
 
 
 # --- terminal constructors: aggregate construction against a collecting session ---
@@ -218,7 +296,7 @@ def test_stored_aggregates_navigate_from_assessment_to_candidate():
     def run() -> tuple[str, str, str, str]:
         async def scenario(session: AsyncSession) -> tuple[str, str, str, str]:
             candidate = await add_candidate(
-                session, "one", "find board members", "https://a.example"
+                session, "one", "Example Foundation", "https://a.example"
             )
             attempt = store_broken_attempt(
                 session,
@@ -238,7 +316,7 @@ def test_stored_aggregates_navigate_from_assessment_to_candidate():
                         .selectinload(Candidate.url),
                         selectinload(SnapshotAssessment.attempt)
                         .selectinload(Attempt.candidate)
-                        .selectinload(Candidate.objective),
+                        .selectinload(Candidate.subject),
                     )
                     .where(SnapshotAssessment.snapshot_id == attempt.snapshot_id)
                 )
@@ -246,7 +324,7 @@ def test_stored_aggregates_navigate_from_assessment_to_candidate():
             return (
                 loaded.attempt.id == attempt.id and "attempt",
                 loaded.attempt.candidate.url.url,
-                loaded.attempt.candidate.objective.description,
+                loaded.attempt.candidate.subject.name,
                 loaded.reason or "",
                 loaded.status,
                 loaded.attempt.created_at is not None
@@ -259,7 +337,7 @@ def test_stored_aggregates_navigate_from_assessment_to_candidate():
     assert run() == (
         "attempt",
         "https://a.example",
-        "find board members",
+        "Example Foundation",
         "Cloudflare challenge",
         SnapshotStatus.BROKEN,
         "server defaults",
@@ -331,20 +409,19 @@ def test_store_inspection_miss_has_reason_and_no_graph():
 
 
 async def add_candidate(
-    session: AsyncSession, dataset: str, objective: str, url: str
+    session: AsyncSession, dataset: str, subject: str, url: str
 ) -> Candidate:
-    await import_candidates(session, [(dataset, objective, url)])
+    await import_catalogue(
+        session,
+        [make_definition(dataset, "Board members", "Organization", {subject: [url]})],
+    )
     await session.flush()
     stmt = (
         select(Candidate)
-        .join(Objective, Objective.id == Candidate.objective_id)
-        .join(Dataset, Dataset.id == Objective.dataset_id)
+        .join(Subject, Subject.id == Candidate.subject_id)
+        .join(Dataset, Dataset.id == Subject.dataset_id)
         .join(Url, Url.id == Candidate.url_id)
-        .where(
-            (Dataset.name == dataset)
-            & (Objective.description == objective)
-            & (Url.url == url)
-        )
+        .where((Dataset.name == dataset) & (Subject.name == subject) & (Url.url == url))
     )
     return (await session.execute(stmt)).scalar_one()
 
@@ -407,7 +484,7 @@ def test_select_due_candidates_by_latest_verdict(verdict, age, due):
     def run() -> list[tuple[str, str, str]]:
         async def scenario(session: AsyncSession) -> list[tuple[str, str, str]]:
             candidate = await add_candidate(
-                session, "one", "find board members", "https://a.example"
+                session, "one", "Example Foundation", "https://a.example"
             )
             if verdict is not None:
                 match verdict:
@@ -433,13 +510,13 @@ def test_select_due_candidates_by_latest_verdict(verdict, age, due):
                 )
             await session.commit()
             return [
-                (c.objective.dataset.name, c.objective.description, c.url.url)
+                (c.subject.dataset.name, c.subject.name, c.url.url)
                 for c in await select_due_candidates(session, timedelta(days=7))
             ]
 
         return asyncio.run(run_with_session(scenario))
 
-    expected = [("one", "find board members", "https://a.example")]
+    expected = [("one", "Example Foundation", "https://a.example")]
     assert (run() == expected) is due
 
 
@@ -449,7 +526,7 @@ def test_select_due_candidates_recent_result_supersedes_older_hit():
     def run() -> list[tuple[str, str, str]]:
         async def scenario(session: AsyncSession) -> list[tuple[str, str, str]]:
             candidate = await add_candidate(
-                session, "one", "find board members", "https://a.example"
+                session, "one", "Example Foundation", "https://a.example"
             )
             session.add(
                 make_attempt(
@@ -467,7 +544,7 @@ def test_select_due_candidates_recent_result_supersedes_older_hit():
             )
             await session.commit()
             return [
-                (c.objective.dataset.name, c.objective.description, c.url.url)
+                (c.subject.dataset.name, c.subject.name, c.url.url)
                 for c in await select_due_candidates(session, timedelta(days=7))
             ]
 
@@ -479,12 +556,24 @@ def test_select_due_candidates_recent_result_supersedes_older_hit():
 def test_select_due_candidates_orders_deterministically():
     def run() -> list[str]:
         async def scenario(session: AsyncSession) -> list[str]:
-            await import_candidates(
+            await import_catalogue(
                 session,
                 [
-                    ("two", "find legislators", "https://a.example"),
-                    ("one", "find legislators", "https://b.example"),
-                    ("one", "find board members", "https://c.example"),
+                    make_definition(
+                        "two",
+                        "Legislators",
+                        "Sending country",
+                        {"France": ["https://a.example"]},
+                    ),
+                    make_definition(
+                        "one",
+                        "People",
+                        "Subject",
+                        {
+                            "France": ["https://b.example"],
+                            "Example Foundation": ["https://c.example"],
+                        },
+                    ),
                 ],
             )
             await session.commit()
@@ -495,7 +584,7 @@ def test_select_due_candidates_orders_deterministically():
 
         return asyncio.run(run_with_session(scenario))
 
-    # Dataset name, then objective description, then url.
+    # Dataset name, then subject name, then url.
     assert run() == ["https://c.example", "https://b.example", "https://a.example"]
 
 
@@ -505,7 +594,7 @@ def test_select_due_candidates_breaks_created_at_ties_by_attempt_id():
     def run() -> list[str]:
         async def scenario(session: AsyncSession) -> list[str]:
             candidate = await add_candidate(
-                session, "one", "find board members", "https://a.example"
+                session, "one", "Example Foundation", "https://a.example"
             )
             tie = datetime.now(UTC) - timedelta(days=30)
             low, high = uuid4(), uuid4()

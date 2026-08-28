@@ -1,13 +1,13 @@
 """Run the inspection eval suite against frozen HTML fixtures.
 
-Datasets live in datasets/ as YAML (validated against the generated
-*_schema.json); fixtures are fictional pages structurally equivalent to real
-captures. Unlike the pytest suite, this hits a real model and costs tokens —
+Datasets live in datasets/ as YAML and are validated from their Pydantic
+models when loaded; fixtures are fictional pages structurally equivalent to
+real captures. Unlike the pytest suite, this hits a real model and costs tokens —
 run it deliberately:
 
     uv run --env-file .env python -m evals.run [--dataset PATH] [--model NAME]
 
-Exit status is nonzero when any case fails an assertion.
+Exit status is nonzero when a case fails, raises, or an evaluator crashes.
 """
 
 import argparse
@@ -47,7 +47,7 @@ def main() -> int:
     )
     report.print(include_input=True, include_output=True, include_durations=True)
 
-    failed = any(
+    failed = bool(report.failures or report.report_evaluator_failures) or any(
         result.value is False
         for case in report.cases
         for result in case.assertions.values()

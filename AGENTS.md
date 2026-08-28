@@ -1,6 +1,6 @@
 # Funes
 
-Funes turns web pages into objective-scoped people/position facts. It embeds [Pravda](https://github.com/opensanctions/pravda) (PyPI: `opensanctions-pravda`) as an in-process async library for page capture and storage, and queues candidate-inspection jobs through Procrastinate. Funes owns the infrastructure Pravda connects to: a headed Chrome browser, an async Postgres database, and an fsspec artifact store (see `.env.example`).
+Funes turns web pages into inspection-brief-scoped people/position facts. It embeds [Pravda](https://github.com/opensanctions/pravda) (PyPI: `opensanctions-pravda`) as an in-process async library for page capture and storage, and queues candidate-inspection jobs through Procrastinate. Funes owns the infrastructure Pravda connects to: a headed Chrome browser, an async Postgres database, and an fsspec artifact store (see `.env.example`).
 
 ## Project philosophy
 
@@ -13,7 +13,7 @@ Funes turns web pages into objective-scoped people/position facts. It embeds [Pr
 ```bash
 uv sync                  # install dependencies
 docker compose up -d     # shared dev infrastructure: Postgres + headed Chrome
-uv run --env-file .env funes migrate      # apply Pravda and Funes schemas, bootstrap candidates from CSVs
+uv run --env-file .env funes migrate      # apply Pravda and Funes schemas, bootstrap candidates from YAML
 uv run --env-file .env funes enqueue      # queue one job per due candidate
 uv run --env-file .env procrastinate worker --queues inspect  # consume the inspect queue only; repair jobs stay pending
 uv run --env-file .env procrastinate shell list_jobs    # inspect the queue
@@ -33,9 +33,9 @@ funes/
   capture.py    # Pravda client and fsspec artifact helpers
   extract.py    # pydantic-ai extraction agent, Hit/Miss/BrokenSnapshot output schema, prompt
   outline.py    # compact model-facing outline from rendered HTML + HAR
-  db.py         # SQLAlchemy models: Objective/URL/Candidate/Attempt persistence
+  db.py         # SQLAlchemy models: Dataset/Subject/URL/Candidate/Attempt persistence
   migrate.py    # Alembic runner; migrations/ holds Funes's ledger
-  sources.py    # bootstrap CSV loading (objective,url rows)
+  sources.py    # bootstrap YAML loading (dataset/subject/url catalogue)
   config.py     # typed configuration
   sessions.py   # agent session transcripts
 tests/          # pytest suite

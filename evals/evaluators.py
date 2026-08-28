@@ -1,8 +1,7 @@
 """Custom evaluators for the inspection eval suite.
 
 Classes referenced from dataset YAML must also be listed in
-CUSTOM_EVALUATOR_TYPES and passed to both ``Dataset.from_file`` and
-``Dataset.to_file``.
+CUSTOM_EVALUATOR_TYPES and passed to ``Dataset.from_file``.
 """
 
 from dataclasses import dataclass

@@ -12,7 +12,7 @@ from funes import db
 from funes.config import load_config
 from funes.migrate import migrate
 from funes.procrastinate import app
-from funes.sources import load_inputs
+from funes.sources import load_datasets
 from funes.tasks import inspect_candidate
 
 log = logging.getLogger("funes")
@@ -26,8 +26,8 @@ def cli() -> None:
 @cli.command(
     help=(
         "Apply Pravda's packaged migrations, then Funes's own, then "
-        "append-only import dataset/objective/URL candidate rows from the "
-        "input CSVs."
+        "append-only import dataset/subject/URL candidate rows from the "
+        "input YAML datasets."
     )
 )
 def migrate_cmd() -> None:
@@ -37,12 +37,16 @@ def migrate_cmd() -> None:
         await pravda_migrate(config.pravda.database_url)
         await migrate(config.pravda.database_url)
 
-        rows = load_inputs(config.input.base_path)
-        log.info("%d input row(s)", len(rows))
+        definitions = load_datasets(config.input.base_path)
+        log.info(
+            "%d input dataset(s), %d subject(s)",
+            len(definitions),
+            sum(len(definition.subjects) for definition in definitions),
+        )
         engine = create_async_engine(config.pravda.database_url)
         try:
             async with async_sessionmaker(engine)() as session:
-                await db.import_candidates(session, rows)
+                await db.import_catalogue(session, definitions)
                 await session.commit()
         finally:
             await engine.dispose()

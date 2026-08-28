@@ -1,4 +1,4 @@
-"""Normalized objective/url candidate and attempt persistence."""
+"""Normalized dataset/subject/url candidate and attempt persistence."""
 
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -16,6 +16,7 @@ from sqlalchemy import (
     func,
     or_,
     select,
+    tuple_,
 )
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -29,6 +30,7 @@ from sqlalchemy.orm import (
 )
 
 from funes.extract import Hit, Miss
+from funes.sources import DatasetDefinition
 
 
 class SnapshotStatus(StrEnum):
@@ -45,10 +47,10 @@ class SnapshotStatus(StrEnum):
 
 
 class InspectionOutcome(StrEnum):
-    """Terminal judgement of a usable snapshot against an objective.
+    """Terminal judgement of a usable snapshot against an inspection brief.
 
-    - hit: the objective is satisfied; extracted people are attached.
-    - miss: nothing satisfies the objective; ``reason`` explains why.
+    - hit: the brief is satisfied; extracted people are attached.
+    - miss: nothing satisfies the brief; ``reason`` explains why.
     """
 
     HIT = "hit"
@@ -60,44 +62,50 @@ class Base(DeclarativeBase):
 
 
 class Dataset(Base):
-    """One input dataset, named after its source CSV filename stem."""
+    """One input dataset, named after its source YAML filename stem.
+
+    ``people_sought`` names the class of position holders to find;
+    ``subject_label`` names each subject's role in the inspection brief.
+    """
 
     __tablename__ = "dataset"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(unique=True)
+    people_sought: Mapped[str] = mapped_column()
+    subject_label: Mapped[str] = mapped_column()
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
-    objectives: Mapped[list["Objective"]] = relationship(
+    subjects: Mapped[list["Subject"]] = relationship(
         back_populates="dataset", cascade="all, delete-orphan"
     )
 
 
-class Objective(Base):
-    """What a dataset wants to learn from pages, owned by one dataset."""
+class Subject(Base):
+    """One named entity scoping the dataset's people sought."""
 
-    __tablename__ = "objective"
-    __table_args__ = (UniqueConstraint("dataset_id", "description"),)
+    __tablename__ = "subject"
+    __table_args__ = (UniqueConstraint("dataset_id", "name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     dataset_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("dataset.id", ondelete="CASCADE")
     )
-    description: Mapped[str] = mapped_column()
+    name: Mapped[str] = mapped_column()
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
-    dataset: Mapped[Dataset] = relationship(back_populates="objectives")
+    dataset: Mapped[Dataset] = relationship(back_populates="subjects")
     candidates: Mapped[list["Candidate"]] = relationship(
-        back_populates="objective", cascade="all, delete-orphan"
+        back_populates="subject", cascade="all, delete-orphan"
     )
 
 
 class Url(Base):
-    """Objective-independent URL identity for snapshot capture."""
+    """Subject-independent URL identity for snapshot capture."""
 
     __tablename__ = "url"
 
@@ -113,21 +121,21 @@ class Url(Base):
 
 
 class Candidate(Base):
-    """The objective ↔ url relation: one unit of work for the pipeline."""
+    """The subject ↔ url relation: one unit of work for the pipeline."""
 
     __tablename__ = "candidate"
-    __table_args__ = (UniqueConstraint("objective_id", "url_id"),)
+    __table_args__ = (UniqueConstraint("subject_id", "url_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    objective_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("objective.id", ondelete="CASCADE")
+    subject_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("subject.id", ondelete="CASCADE")
     )
     url_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("url.id", ondelete="CASCADE"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
-    objective: Mapped[Objective] = relationship(back_populates="candidates")
+    subject: Mapped[Subject] = relationship(back_populates="candidates")
     url: Mapped[Url] = relationship(back_populates="candidates")
     attempts: Mapped[list["Attempt"]] = relationship(
         back_populates="candidate", cascade="all, delete-orphan"
@@ -184,7 +192,7 @@ class SnapshotAssessment(Base):
 
 
 class Inspection(Base):
-    """The judgement of a usable snapshot against one objective."""
+    """The judgement of a usable snapshot against one inspection brief."""
 
     __tablename__ = "inspection"
 
@@ -260,87 +268,116 @@ def _upsert_insert(session: AsyncSession):
             raise ValueError(f"unsupported dialect: {dialect!r}")
 
 
-async def import_candidates(
-    session: AsyncSession, rows: list[tuple[str, str, str]]
+async def import_catalogue(
+    session: AsyncSession, definitions: list[DatasetDefinition]
 ) -> None:
-    """Append-only import of ``(dataset, objective, url)`` rows.
+    """Append-only import of dataset definitions into the catalogue.
 
-    Creates missing datasets, objectives, urls, and candidates; existing
-    rows are left untouched (insert-on-conflict does nothing). No updates
-    or deletes are ever performed.
+    Creates missing datasets, subjects, urls, and candidates; existing rows
+    are left untouched (insert-on-conflict does nothing). No updates or
+    deletes are ever performed. An existing dataset whose ``people_sought``
+    or ``subject_label`` differs from configuration fails loudly: drift
+    means the dataset's meaning changed and must be resolved explicitly.
     """
-    if not rows:
+    if not definitions:
         return
     insert = _upsert_insert(session)
-    names = list(dict.fromkeys(dataset for dataset, _, _ in rows))
-    descriptions = list(dict.fromkeys(objective for _, objective, _ in rows))
-    urls = list(dict.fromkeys(url for _, _, url in rows))
+    names = list(dict.fromkeys(definition.name for definition in definitions))
     await session.execute(
         insert(Dataset)
-        .values([{Dataset.name: name} for name in names])
+        .values(
+            [
+                {
+                    Dataset.name: definition.name,
+                    Dataset.people_sought: definition.people_sought,
+                    Dataset.subject_label: definition.subject_label,
+                }
+                for definition in definitions
+            ]
+        )
         .on_conflict_do_nothing(index_elements=[Dataset.name])
     )
-    await session.execute(
-        insert(Url)
-        .values([{Url.url: url} for url in urls])
-        .on_conflict_do_nothing(index_elements=[Url.url])
-    )
-    dataset_id_by_name = dict(
-        (
-            await session.execute(
-                select(Dataset.name, Dataset.id).where(Dataset.name.in_(names))
-            )
-        ).all()
-    )
-    url_id_by_url = dict(
-        (await session.execute(select(Url.url, Url.id).where(Url.url.in_(urls)))).all()
-    )
-    objective_keys = sorted(
-        {(dataset_id_by_name[dataset], description) for dataset, description, _ in rows}
-    )
-    await session.execute(
-        insert(Objective)
-        .values(
-            [
-                {
-                    Objective.dataset_id: dataset_id,
-                    Objective.description: description,
-                }
-                for dataset_id, description in objective_keys
-            ]
-        )
-        .on_conflict_do_nothing(
-            index_elements=[Objective.dataset_id, Objective.description]
-        )
-    )
-    objective_id_by_key = {
-        (dataset_id, description): objective_id
-        for dataset_id, description, objective_id in (
-            await session.execute(
-                select(Objective.dataset_id, Objective.description, Objective.id).where(
-                    Objective.dataset_id.in_(dataset_id_by_name.values()),
-                    Objective.description.in_(descriptions),
-                )
-            )
-        ).all()
+    dataset_by_name = {
+        dataset.name: dataset
+        for dataset in (
+            await session.execute(select(Dataset).where(Dataset.name.in_(names)))
+        ).scalars()
     }
-    await session.execute(
-        insert(Candidate)
-        .values(
-            [
-                {
-                    Candidate.objective_id: objective_id_by_key[
-                        (dataset_id_by_name[dataset], description)
-                    ],
-                    Candidate.url_id: url_id_by_url[url],
-                }
-                for dataset, description, url in rows
-            ]
-        )
-        .on_conflict_do_nothing(
-            index_elements=[Candidate.objective_id, Candidate.url_id]
-        )
+    for definition in definitions:
+        dataset = dataset_by_name[definition.name]
+        for column in ("people_sought", "subject_label"):
+            stored = getattr(dataset, column)
+            configured = getattr(definition, column)
+            if stored != configured:
+                raise ValueError(
+                    f"dataset {definition.name!r} is configured with "
+                    f"{column} {configured!r} but stored as {stored!r}; "
+                    "resolve the drift explicitly (development data is "
+                    "disposable)"
+                )
+    configured_subjects = [
+        (dataset_by_name[definition.name], subject)
+        for definition in definitions
+        for subject in definition.subjects
+    ]
+    urls = list(
+        dict.fromkeys(url for _, subject in configured_subjects for url in subject.urls)
     )
+    if urls:
+        await session.execute(
+            insert(Url)
+            .values([{Url.url: url} for url in urls])
+            .on_conflict_do_nothing(index_elements=[Url.url])
+        )
+        url_id_by_url = dict(
+            (
+                await session.execute(select(Url.url, Url.id).where(Url.url.in_(urls)))
+            ).all()
+        )
+    else:
+        url_id_by_url = {}
+    subject_keys = sorted(
+        {(dataset.id, subject.name) for dataset, subject in configured_subjects}
+    )
+    if subject_keys:
+        await session.execute(
+            insert(Subject)
+            .values(
+                [
+                    {Subject.dataset_id: dataset_id, Subject.name: name}
+                    for dataset_id, name in subject_keys
+                ]
+            )
+            .on_conflict_do_nothing(index_elements=[Subject.dataset_id, Subject.name])
+        )
+        subject_id_by_key = {
+            (dataset_id, name): subject_id
+            for dataset_id, name, subject_id in (
+                await session.execute(
+                    select(Subject.dataset_id, Subject.name, Subject.id).where(
+                        tuple_(Subject.dataset_id, Subject.name).in_(subject_keys)
+                    )
+                )
+            ).all()
+        }
+    else:
+        subject_id_by_key = {}
+    candidates = [
+        {
+            Candidate.subject_id: subject_id_by_key[(dataset.id, subject.name)],
+            Candidate.url_id: url_id_by_url[url],
+        }
+        for dataset, subject in configured_subjects
+        for url in subject.urls
+    ]
+    if candidates:
+        await session.execute(
+            insert(Candidate)
+            .values(candidates)
+            .on_conflict_do_nothing(
+                index_elements=[Candidate.subject_id, Candidate.url_id]
+            )
+        )
 
 
 async def select_due_candidates(
@@ -376,11 +413,11 @@ async def select_due_candidates(
     stmt = (
         select(Candidate)
         .options(
-            selectinload(Candidate.objective).selectinload(Objective.dataset),
+            selectinload(Candidate.subject).selectinload(Subject.dataset),
             selectinload(Candidate.url),
         )
-        .join(Objective, Objective.id == Candidate.objective_id)
-        .join(Dataset, Dataset.id == Objective.dataset_id)
+        .join(Subject, Subject.id == Candidate.subject_id)
+        .join(Dataset, Dataset.id == Subject.dataset_id)
         .join(Url, Url.id == Candidate.url_id)
         .outerjoin(latest, latest.c.candidate_id == Candidate.id)
         .where(
@@ -394,7 +431,7 @@ async def select_due_candidates(
                 ),
             )
         )
-        .order_by(Dataset.name, Objective.description, Url.url)
+        .order_by(Dataset.name, Subject.name, Url.url)
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())

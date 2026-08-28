@@ -55,7 +55,7 @@ async def repair_snapshot(attempt_id: str) -> None:
 
 @app.task(name=Task.INSPECT_CANDIDATE, queue=Queue.INSPECT)
 async def inspect_candidate(candidate_id: str) -> None:
-    """Capture one Candidate's URL and judge it against its objective.
+    """Capture one Candidate's URL and judge it against its inspection brief.
 
     Procrastinate is the pending/running/failure ledger; the database
     records exactly one terminal aggregate per completed run (a Hit/Miss
@@ -79,14 +79,16 @@ async def inspect_candidate(candidate_id: str) -> None:
                 db.Candidate,
                 uuid.UUID(candidate_id),
                 options=(
-                    selectinload(db.Candidate.objective),
+                    selectinload(db.Candidate.subject).selectinload(db.Subject.dataset),
                     selectinload(db.Candidate.url),
                 ),
             )
             if candidate is None:
                 raise LookupError(f"candidate {candidate_id} not found")
             url = candidate.url.url
-            objective = candidate.objective.description
+            people_sought = candidate.subject.dataset.people_sought
+            subject_label = candidate.subject.dataset.subject_label
+            subject = candidate.subject.name
             # End the read transaction before capture and LLM work;
             # expire_on_commit=False keeps the loaded attributes alive.
             await session.commit()
@@ -121,12 +123,15 @@ async def inspect_candidate(candidate_id: str) -> None:
             )
             outline = build_outline(snapshot.final_url, html, snapshot.http_archive)
             deps = ExtractionDependencies(
+                people_sought=people_sought,
+                subject_label=subject_label,
+                subject=subject,
                 read_resource=partial(read_artifact, fs),
                 resource_media_types=har_resource_media_types(snapshot.http_archive),
             )
             log.info("%s → extracting …", snapshot.final_url)
             run = await extraction_agent.run(
-                build_prompt(objective, metadata, outline),
+                build_prompt(metadata, outline),
                 model=model,
                 run_id=str(attempt_id),
                 deps=deps,

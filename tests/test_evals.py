@@ -7,6 +7,7 @@ import json
 from types import NoneType
 
 import pytest
+from pydantic import ValidationError
 from pydantic_ai.messages import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_evals import Dataset
@@ -30,7 +31,11 @@ def _ctx(expected: PageResult, output: PageResult) -> EvaluatorContext:
     return EvaluatorContext(
         name="test",
         inputs=FixtureInput(
-            fixture="x", url="https://x.example.org/", objective="test objective"
+            fixture="x",
+            url="https://x.example.org/",
+            people_sought="Judges",
+            subject_label="Court",
+            subject="Example Court",
         ),
         metadata=None,
         expected_output=expected,
@@ -56,16 +61,38 @@ def dataset() -> Dataset[FixtureInput, PageResult, NoneType]:
 # --- dataset shape ---
 
 
-def test_dataset_loads_with_objectives_and_result_types(dataset):
+def test_fixture_inputs_fail_loudly_on_unknown_or_blank_fields():
+    with pytest.raises(ValidationError):
+        FixtureInput(
+            fixture="x",
+            url="https://x.example.org/",
+            people_sought="Judges",
+            subject_label="Court",
+            subject=" ",
+        )
+    with pytest.raises(ValidationError):
+        FixtureInput(
+            fixture="x",
+            url="https://x.example.org/",
+            people_sought="Judges",
+            subject_label="Court",
+            subject="Example Court",
+            unexpected=True,
+        )
+
+
+def test_dataset_loads_with_briefs_and_result_types(dataset):
     assert dataset.evaluators == [InspectionF1()]
     kinds = set()
     for case in dataset.cases:
-        assert case.inputs.objective.strip()
+        assert case.inputs.people_sought.strip()
+        assert case.inputs.subject_label.strip()
+        assert case.inputs.subject.strip()
         kinds.add(case.expected_output.kind)
     assert kinds == {"hit", "miss", "broken"}
 
 
-def test_hit_expectations_carry_objective_scoped_graphs(dataset):
+def test_hit_expectations_carry_brief_scoped_graphs(dataset):
     by_name = {case.name: case for case in dataset.cases}
     for case in dataset.cases:
         expected = case.expected_output
@@ -151,14 +178,20 @@ def test_evaluator_hit_non_hit_output_scores_zero():
 # --- eval task prompt API ---
 
 
-def test_extract_builds_objective_scoped_prompt():
-    """extract() feeds inputs.objective into the model prompt."""
+def test_extract_separates_trusted_brief_from_page_prompt():
+    """extract() sends the brief as instructions and the page as user content."""
     import evals.task as task_module
 
     captured = {}
 
     def fn(messages, info):
-        captured["prompt"] = messages[-1].parts[0].content
+        captured["contents"] = [
+            part.content
+            for message in messages
+            for part in message.parts
+            if isinstance(getattr(part, "content", None), str)
+        ]
+        captured["instructions"] = info.instructions
         return ModelResponse(
             parts=[
                 TextPart(
@@ -177,10 +210,18 @@ def test_extract_builds_objective_scoped_prompt():
     inputs = FixtureInput(
         fixture="office_of_the_sg",
         url="https://www.caf.example.org/about/office-of-the-sg",
-        objective="Identify the leadership of the CAF Office of the Secretary-General.",
+        people_sought="Leadership of the Office of the Secretary-General",
+        subject_label="Organization",
+        subject="CAF",
     )
     result = asyncio.run(task_module.extract(inputs, model=FunctionModel(fn)))
     assert isinstance(result, Miss)
-    assert "<objective>" in captured["prompt"]
-    assert inputs.objective in captured["prompt"]
-    assert "office-of-the-sg" in captured["prompt"]
+    assert captured["instructions"].endswith(
+        "People sought: Leadership of the Office of the Secretary-General\n"
+        "Organization: CAF"
+    )
+    [prompt] = [
+        content for content in captured["contents"] if "<page_snapshot>" in content
+    ]
+    assert "<objective>" not in prompt
+    assert "office-of-the-sg" in prompt

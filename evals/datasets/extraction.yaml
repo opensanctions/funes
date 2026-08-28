@@ -1,11 +1,12 @@
-# yaml-language-server: $schema=extraction_schema.json
 name: inspection
 cases:
 - name: office_of_the_sg
   inputs:
     fixture: office_of_the_sg
     url: https://www.caf.example.org/about/office-of-the-sg
-    objective: Identify the leadership of the CAF Office of the Secretary-General.
+    people_sought: Leadership of the Office of the Secretary-General
+    subject_label: Organization
+    subject: CAF
   expected_output:
     kind: hit
     persons:
@@ -21,8 +22,9 @@ cases:
   inputs:
     fixture: roster_table
     url: https://www.lbc.example.org/governance/delegates
-    objective: Identify the delegates and alternates sitting on the Lakes Basin
-      Commission Council.
+    people_sought: Council delegates and alternates
+    subject_label: Organization
+    subject: Lakes Basin Commission
   expected_output:
     kind: hit
     persons:
@@ -56,23 +58,36 @@ cases:
         organization: Lakes Basin Commission Council
         jurisdiction: Thornwick
         start_date: Jan, 2026
+- name: wrong_subject_roster
+  inputs:
+    fixture: roster_table
+    url: https://www.lbc.example.org/governance/delegates
+    people_sought: Council delegates and alternates
+    subject_label: Organization
+    subject: Calder Sea Commission
+  expected_output:
+    kind: miss
+    reason: The page lists delegates and alternates of the Lakes Basin Commission Council,
+      not the Calder Sea Commission.
 - name: bot_challenge
   inputs:
     fixture: bot_challenge
     url: https://www.nw-tribunal.example.org/secretariat/council
-    objective: Identify the judges and officeholders of the Northwest Tribunal's
-      secretariat council.
+    people_sought: Judges and officeholders of the secretariat council
+    subject_label: Organization
+    subject: Northwest Tribunal
   expected_output:
     kind: broken
-    reason: Bot-detection security challenge interstitial ("Just a moment...",
-      "verifies you are not a bot"); no usable source content.
+    reason: Bot-detection security challenge interstitial ("Just a moment...", "verifies you
+      are not a bot"); no usable source content.
 - name: not_found
   inputs:
     fixture: not_found
     url: https://www.nw-tribunal.example.org/secretariat/council
+    people_sought: Judges and officeholders of the secretariat council
+    subject_label: Organization
+    subject: Northwest Tribunal
     http_status: 404
-    objective: Identify the judges and officeholders of the Northwest Tribunal's
-      secretariat council.
   expected_output:
     kind: miss
     reason: The URL returns a 404 page and therefore provides no council roster.
@@ -80,26 +95,29 @@ cases:
   inputs:
     fixture: account_login
     url: https://members.nw-tribunal.example.org/secretariat/council
-    objective: Identify the judges and officeholders of the Northwest Tribunal's
-      secretariat council.
+    people_sought: Judges and officeholders of the secretariat council
+    subject_label: Organization
+    subject: Northwest Tribunal
   expected_output:
     kind: miss
-    reason: The page requires an existing member account and exposes no public
-      council content.
+    reason: The page requires an existing member account and exposes no public council content.
 - name: subscription_paywall
   inputs:
     fixture: subscription_paywall
     url: https://directory.northstar.example.org/leadership
-    objective: Identify the leaders of the Northstar Forum.
+    people_sought: Leaders
+    subject_label: Organization
+    subject: Northstar Forum
   expected_output:
     kind: miss
-    reason: The directory requires a paid subscription and exposes no public
-      leadership content.
+    reason: The directory requires a paid subscription and exposes no public leadership content.
 - name: cookie_consent_wall
   inputs:
     fixture: cookie_consent_wall
     url: https://www.northstar.example.org/leadership
-    objective: Identify the leaders of the Northstar Forum.
+    people_sought: Leaders
+    subject_label: Organization
+    subject: Northstar Forum
   expected_output:
     kind: broken
     reason: A click-through cookie and terms gate blocks the page content.
@@ -107,9 +125,11 @@ cases:
   inputs:
     fixture: server_error
     url: https://www.northstar.example.org/leadership
+    people_sought: Leaders
+    subject_label: Organization
+    subject: Northstar Forum
     http_status: 503
     capture_error: upstream service unavailable
-    objective: Identify the leaders of the Northstar Forum.
   expected_output:
     kind: broken
     reason: The capture contains only a transient 503 service-unavailable page.
@@ -117,9 +137,11 @@ cases:
   inputs:
     fixture: server_error_with_content
     url: https://www.northstar.example.org/leadership
+    people_sought: Leaders
+    subject_label: Organization
+    subject: Northstar Forum
     http_status: 503
     capture_error: secondary service request returned 503
-    objective: Identify the leaders of the Northstar Forum.
   expected_output:
     kind: hit
     persons:
@@ -135,8 +157,10 @@ cases:
   inputs:
     fixture: unexpected_redirect
     url: https://www.northstar.example.org/leadership
+    people_sought: Leaders
+    subject_label: Organization
+    subject: Northstar Forum
     final_url: https://search.example.net/
-    objective: Identify the leaders of the Northstar Forum.
   expected_output:
     kind: broken
     reason: The capture unexpectedly redirected to an unrelated search portal.
@@ -144,29 +168,31 @@ cases:
   inputs:
     fixture: elections_no_holders
     url: https://www.aia.example.org/elecciones
-    objective: Identify the members of the Asamblea del Istmo Austral's 2027-2028
-      Mesa Directiva.
+    people_sought: Members of the 2027-2028 Mesa Directiva
+    subject_label: Organization
+    subject: Asamblea del Istmo Austral
   expected_output:
     kind: miss
-    reason: The page announces the 2027-2028 Mesa Directiva election process (call,
-      calendar, electoral roll, candidacy deadlines) but names no board members
-      or other position holders.
+    reason: The page announces the 2027-2028 Mesa Directiva election process (call, calendar,
+      electoral roll, candidacy deadlines) but names no board members or other position holders.
 - name: nav_menu_hallucination
   inputs:
     fixture: nav_menu_hallucination
     url: https://www.maresia.example.org/o-compacto/organizacao
-    objective: Identify the heads of the Maresia Compact Secretariat's departments
-      and organizational units.
+    people_sought: Heads of departments and organizational units
+    subject_label: Organization
+    subject: Maresia Compact Secretariat
   expected_output:
     kind: miss
-    reason: The page is a navigation menu plus a mission description; it lists
-      curators and executive members by name under nav headings but names no
-      department heads or unit leadership.
+    reason: The page is a navigation menu plus a mission description; it lists curators and
+      executive members by name under nav headings but names no department heads or unit leadership.
 - name: conjoined_role_misattribution
   inputs:
     fixture: conjoined_role_misattribution
     url: https://www.vu.example.org/en/chairperson
-    objective: Identify the Chairpersons of the Veltrane Union.
+    people_sought: Chairpersons
+    subject_label: Organization
+    subject: Veltrane Union
   expected_output:
     kind: hit
     persons:
@@ -186,8 +212,9 @@ cases:
   inputs:
     fixture: board_member_cards
     url: https://www.meridian.example.org/board
-    objective: Identify the members of the Meridian Accord board, including the
-      board chair and alternates.
+    people_sought: Board members, including the chair and alternates
+    subject_label: Organization
+    subject: Meridian Accord
   expected_output:
     kind: hit
     persons:
@@ -221,8 +248,9 @@ cases:
   inputs:
     fixture: parenthetical_home_authority
     url: https://www.cisa.example.org/governance/leadership
-    objective: Identify the chairs and vice chairs of the Corvara Insurance Supervisors
-      Alliance's executive, audit, budget, and standards committees.
+    people_sought: Chairs and vice chairs of the executive, audit, budget, and standards committees
+    subject_label: Organization
+    subject: Corvara Insurance Supervisors Alliance
   expected_output:
     kind: hit
     persons:
@@ -258,8 +286,9 @@ cases:
   inputs:
     fixture: cross_roster_duplicate
     url: https://www.viat.example.org/chambers
-    objective: Identify the judges, including reserve judges, of the Velandra
-      International Arbitration Tribunal's First Chamber.
+    people_sought: Judges, including reserve judges, of the First Chamber
+    subject_label: Organization
+    subject: Velandra International Arbitration Tribunal
   expected_output:
     kind: hit
     persons:
@@ -284,23 +313,25 @@ cases:
   inputs:
     fixture: nationality_vs_origin
     url: https://www.helixconsortium.example.org/our-team
-    objective: Identify the members of the Helix Consortium team.
+    people_sought: Team members
+    subject_label: Organization
+    subject: Helix Consortium
   expected_output:
     kind: hit
     persons:
     - name: Dr. Amara Nkemdirim
+      countries:
+      - Kelmora
       positions:
       - name: Executive officer
         organization: Helix Consortium
-      countries:
-      - Kelmora
     - name: Petar Novakovic
-      positions:
-      - name: Communications officer
-        organization: Helix Consortium
       countries:
       - Solvaria
       - Meridia
+      positions:
+      - name: Communications officer
+        organization: Helix Consortium
     - name: Marina Delgado
       positions:
       - name: Partnerships officer
@@ -319,8 +350,9 @@ cases:
   inputs:
     fixture: collective_role_label
     url: https://www.harborlight.example.org/partners/representatives
-    objective: Identify the heads and named representatives of Harborlight's
-      partner organizations.
+    people_sought: Heads and named representatives of partner organizations
+    subject_label: Organization
+    subject: Harborlight
   expected_output:
     kind: hit
     persons:
@@ -339,7 +371,9 @@ cases:
   inputs:
     fixture: image_only_staff
     url: https://www.caldris.example.org/about/staff-directory
-    objective: Identify the department heads of the Caldris Energy Forum.
+    people_sought: Department heads
+    subject_label: Organization
+    subject: Caldris Energy Forum
   expected_output:
     kind: hit
     persons:

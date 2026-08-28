@@ -33,7 +33,7 @@ COPY datasets ./datasets
 RUN chown -R app:app /app /opt/venv
 USER app
 
-# INPUT_BASE_PATH points at the CSVs baked into the image; the PRAVDA_*
+# INPUT_BASE_PATH points at the YAML catalogues baked into the image; the PRAVDA_*
 # variables must be supplied at runtime (e.g. by the k8s CronJob spec).
 # PROCRASTINATE_APP points the Procrastinate CLI at the module-level app,
 # so the entrypoint needs no -a flag.

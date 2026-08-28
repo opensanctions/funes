@@ -1,47 +1,112 @@
-"""Unit tests for input CSV loading."""
+"""Behavior tests for input YAML catalogue loading."""
 
 import fsspec
+import pytest
+from pydantic import ValidationError
+
+from funes.sources import DatasetDefinition, SubjectDefinition, load_datasets
 
 
-def write_csv(fs, base, name, content):
+def write_yaml(fs, base, name, content):
     fs.mkdirs(base, exist_ok=True)
     with fs.open(f"{base}/{name}", "w", encoding="utf-8") as f:
         f.write(content)
 
 
-def test_load_inputs_groups_rows_by_csv_in_filename_order(tmp_path):
+def test_load_datasets_builds_hierarchy_in_filename_order(tmp_path):
     fs = fsspec.filesystem("memory")
     base = f"memory://{tmp_path.name}/inputs"
-    write_csv(
+    write_yaml(
         fs,
         base,
-        "two.csv",
-        "objective,url\nHeads of Org C,https://c.example\n",
+        "two.yaml",
+        """\
+people_sought: Judges
+subject_label: Court
+subjects:
+  - name: Court C
+    urls: []
+""",
     )
-    write_csv(
+    write_yaml(
         fs,
         base,
-        "one.csv",
-        "objective,url\nHeads of Org A,https://a.example\nHeads of Org B,https://b.example\n",
+        "one.yaml",
+        """\
+people_sought: Heads
+subject_label: Organization
+subjects:
+  - name: Org A
+    urls:
+      - https://a.example
+      - https://a.example/about
+  - name: Org B
+""",
     )
-    from funes.sources import load_inputs
 
-    assert load_inputs(base) == [
-        ("one", "Heads of Org A", "https://a.example"),
-        ("one", "Heads of Org B", "https://b.example"),
-        ("two", "Heads of Org C", "https://c.example"),
+    assert load_datasets(base) == [
+        DatasetDefinition(
+            name="one",
+            people_sought="Heads",
+            subject_label="Organization",
+            subjects=[
+                SubjectDefinition(
+                    name="Org A",
+                    urls=["https://a.example", "https://a.example/about"],
+                ),
+                SubjectDefinition(name="Org B"),
+            ],
+        ),
+        DatasetDefinition(
+            name="two",
+            people_sought="Judges",
+            subject_label="Court",
+            subjects=[SubjectDefinition(name="Court C")],
+        ),
     ]
 
 
-def test_load_inputs_strips_whitespace(tmp_path):
+def test_load_datasets_strips_catalogue_strings(tmp_path):
     fs = fsspec.filesystem("memory")
     base = f"memory://{tmp_path.name}/inputs"
-    write_csv(
+    write_yaml(
         fs,
         base,
-        "one.csv",
-        "objective,url\n  Heads of Org A  ,  https://a.example  \n",
+        "one.yaml",
+        """\
+people_sought: "  Heads  "
+subject_label: "  Organization  "
+subjects:
+  - name: "  Org A  "
+    urls: ["  https://a.example  "]
+""",
     )
-    from funes.sources import load_inputs
 
-    assert load_inputs(base) == [("one", "Heads of Org A", "https://a.example")]
+    assert load_datasets(base) == [
+        DatasetDefinition(
+            name="one",
+            people_sought="Heads",
+            subject_label="Organization",
+            subjects=[SubjectDefinition(name="Org A", urls=["https://a.example"])],
+        )
+    ]
+
+
+def test_load_datasets_rejects_duplicate_subjects(tmp_path):
+    fs = fsspec.filesystem("memory")
+    base = f"memory://{tmp_path.name}/inputs"
+    write_yaml(
+        fs,
+        base,
+        "one.yaml",
+        """\
+people_sought: Heads
+subject_label: Organization
+subjects:
+  - name: Org A
+  - name: Org A
+""",
+    )
+
+    with pytest.raises(ValidationError, match="duplicate subject"):
+        load_datasets(base)

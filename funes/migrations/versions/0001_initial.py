@@ -1,4 +1,4 @@
-"""initial objective/url/attempt schema
+"""initial dataset/subject/url/attempt schema
 
 Revision ID: 0001
 Revises:
@@ -21,6 +21,8 @@ def upgrade() -> None:
         "dataset",
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("people_sought", sa.Text(), nullable=False),
+        sa.Column("subject_label", sa.Text(), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -31,10 +33,10 @@ def upgrade() -> None:
         sa.UniqueConstraint("name"),
     )
     op.create_table(
-        "objective",
+        "subject",
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("dataset_id", sa.Uuid(), nullable=False),
-        sa.Column("description", sa.Text(), nullable=False),
+        sa.Column("name", sa.Text(), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -43,7 +45,7 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(["dataset_id"], ["dataset.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("dataset_id", "description"),
+        sa.UniqueConstraint("dataset_id", "name"),
     )
     op.create_table(
         "url",
@@ -61,7 +63,7 @@ def upgrade() -> None:
     op.create_table(
         "candidate",
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("objective_id", sa.Uuid(), nullable=False),
+        sa.Column("subject_id", sa.Uuid(), nullable=False),
         sa.Column("url_id", sa.Uuid(), nullable=False),
         sa.Column(
             "created_at",
@@ -69,10 +71,10 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(["objective_id"], ["objective.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["subject_id"], ["subject.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["url_id"], ["url.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("objective_id", "url_id"),
+        sa.UniqueConstraint("subject_id", "url_id"),
     )
     op.create_table(
         "attempt",
@@ -168,5 +170,5 @@ def downgrade() -> None:
     op.drop_table("attempt")
     op.drop_table("candidate")
     op.drop_table("url")
-    op.drop_table("objective")
+    op.drop_table("subject")
     op.drop_table("dataset")

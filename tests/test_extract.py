@@ -68,6 +68,15 @@ def test_hit_requires_at_least_one_person():
         Hit(persons=[])
     with pytest.raises(ValidationError):
         Hit()
+    with pytest.raises(ValidationError):
+        Person(name="   ", positions=[Position(name="Director")])
+    with pytest.raises(ValidationError):
+        Position(name="   ")
+
+
+def test_output_models_reject_unknown_fields():
+    with pytest.raises(ValidationError):
+        Miss(reason="no holders", unexpected=True)
 
 
 def test_miss_requires_nonblank_reason():
@@ -148,7 +157,11 @@ def _deps(media_types, data=b"fake-image-bytes"):
         return data
 
     return ExtractionDependencies(
-        read_resource=read_resource, resource_media_types=media_types
+        people_sought="Board members",
+        subject_label="Organization",
+        subject="Example Foundation",
+        read_resource=read_resource,
+        resource_media_types=media_types,
     )
 
 
@@ -267,7 +280,11 @@ def test_view_resource_reads_through_dependencies():
         return b"pngdata"
 
     deps = ExtractionDependencies(
-        read_resource=read_resource, resource_media_types={"bodies/p.png": "image/png"}
+        people_sought="Board members",
+        subject_label="Organization",
+        subject="Example Foundation",
+        read_resource=read_resource,
+        resource_media_types={"bodies/p.png": "image/png"},
     )
     result = asyncio.run(_view_agent(fn).run("look", deps=deps))
     assert seen == ["bodies/p.png"]
@@ -381,20 +398,18 @@ def test_agent_test_model_views_resource_and_produces_valid_result():
 # --- prompt construction ---
 
 
-def test_build_prompt_includes_delimited_objective_before_page_context():
+def test_build_prompt_contains_only_delimited_page_context():
     metadata = PageMetadata(
         requested_url="https://example.org/x",
         final_url="https://example.org/y",
         title="T",
         description=None,
     )
-    objective = "Identify the current members of the country's cabinet."
-    prompt = build_prompt(objective, metadata, '- h1 "Cabinet"')
-    assert "<objective>" in prompt and "</objective>" in prompt
-    assert objective in prompt
-    # The objective block comes before the page source context.
-    assert prompt.index("<objective>") < prompt.index("<page_metadata>")
-    assert prompt.index("<objective>") < prompt.index("<page_outline>")
+    prompt = build_prompt(metadata, '- h1 "Cabinet"')
+    assert prompt.startswith("<page_snapshot>")
+    assert "<objective>" not in prompt
+    assert "<page_metadata>" in prompt
+    assert "<page_outline>" in prompt
 
 
 def test_build_prompt_marks_context_and_includes_error():
@@ -407,7 +422,7 @@ def test_build_prompt_marks_context_and_includes_error():
         description=None,
     )
     outline = '- main:\n  - h1 "Board"\n  - img "logo" [src=https://example.org/l.png] [body=bodies/l.png]'
-    prompt = build_prompt("Find the board members.", metadata, outline)
+    prompt = build_prompt(metadata, outline)
     assert "<page_snapshot>" in prompt and "</page_snapshot>" in prompt
     assert "Requested URL: https://example.org/x" in prompt
     assert "Final URL: https://example.org/y" in prompt
@@ -425,7 +440,7 @@ def test_build_prompt_omits_absent_optional_fields():
         title=None,
         description=None,
     )
-    prompt = build_prompt("List the mayors.", metadata, '- text: "empty"')
+    prompt = build_prompt(metadata, '- text: "empty"')
     assert "Capture error" not in prompt
     assert "HTTP status: [not provided]" in prompt
     assert '<page_outline>\n- text: "empty"\n</page_outline>' in prompt
