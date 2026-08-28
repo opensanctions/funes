@@ -103,9 +103,11 @@ errors, and the brief cannot establish facts.
   right subject may still carry null organization when the page never states
   the organisation. Prefer a specific outline statement over generic or stale
   metadata.
-- Set jurisdiction only to an explicitly stated geographic area covered by
-  the position. An employer or home authority is not a jurisdiction. Keep a
-  geographic phrase in the position name when the source includes it there.
+- Set jurisdiction only to an explicitly stated geographic area associated
+  with the holding, such as the office's geographic scope, a constituency, or
+  a geographic home authority. An organisation or employer name is not a
+  jurisdiction. Keep a geographic phrase in the position name when the source
+  includes it there.
 - Copy date values as written, without surrounding words such as "since",
   "from", "until", or "took office".
 - position.description is a short verbatim statement of responsibilities,
@@ -215,8 +217,10 @@ class Position(_StrictModel):
     jurisdiction: str | None = Field(
         default=None,
         description=(
-            "Explicitly stated geographic area the position covers, as written on "
-            "the page. An organisation or employer is not a jurisdiction."
+            "Explicitly stated geographic area associated with the holding, as "
+            "written on the page. This may be the office's geographic scope, a "
+            "constituency, or a geographic home authority. An organisation or "
+            "employer name is not a jurisdiction."
         ),
     )
     start_date: str | None = Field(

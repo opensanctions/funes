@@ -157,10 +157,77 @@ def test_evaluator_hit_scores_person_position_graph():
         ),
     )
     scores = InspectionF1().evaluate(_ctx(expected, actual))
-    assert not scores["persons_match"].value  # extra person
+    assert not scores["hit_match"].value
     assert scores["person_f1"] == pytest.approx(2 * 1 * 1 / (1 + 2))
     assert scores["person_position_f1"] == pytest.approx(2 * 1 * 1 / (1 + 2))
     assert scores["organization_accuracy"] == 1.0
+
+
+def test_evaluator_hit_exact_match_ignores_order_and_informational_prose():
+    expected = _hit(
+        Person(
+            name="A",
+            dob="1970",
+            bio="Expected biography.",
+            countries=["North", "South"],
+            positions=[
+                Position(
+                    name="Chair",
+                    organization="Council",
+                    description="Expected responsibilities.",
+                    jurisdiction="North",
+                    start_date="2020",
+                    end_date="2024",
+                ),
+                Position(name="Member", organization="Council"),
+            ],
+        )
+    )
+    actual = _hit(
+        Person(
+            name="A",
+            dob="1970",
+            bio="Different but valid biography.",
+            countries=["South", "North"],
+            positions=[
+                Position(name="Member", organization="Council"),
+                Position(
+                    name="Chair",
+                    organization="Council",
+                    description="Different but valid responsibilities.",
+                    jurisdiction="North",
+                    start_date="2020",
+                    end_date="2024",
+                ),
+            ],
+        )
+    )
+
+    scores = InspectionF1().evaluate(_ctx(expected, actual))
+
+    assert scores["hit_match"].value
+
+
+def test_evaluator_hit_qualifier_difference_fails_exact_match():
+    expected = _hit(
+        Person(
+            name="A",
+            positions=[Position(name="Chair", organization="Expected Council")],
+        )
+    )
+    actual = _hit(
+        Person(
+            name="A",
+            positions=[Position(name="Chair", organization="Other Council")],
+        )
+    )
+
+    scores = InspectionF1().evaluate(_ctx(expected, actual))
+
+    assert not scores["hit_match"].value
+    assert scores["person_f1"] == 1.0
+    assert scores["person_position_f1"] == 1.0
+    assert scores["organization_accuracy"] == 0.0
 
 
 def test_evaluator_hit_non_hit_output_scores_zero():
@@ -169,7 +236,7 @@ def test_evaluator_hit_non_hit_output_scores_zero():
     )
     for wrong in (Miss(reason="no holders"), BrokenSnapshot(reason="challenge")):
         scores = InspectionF1().evaluate(_ctx(expected, wrong))
-        assert not scores["persons_match"].value
+        assert not scores["hit_match"].value
         assert scores["person_f1"] == 0.0
         assert scores["person_position_f1"] == 0.0
         assert scores["organization_accuracy"] == 0.0

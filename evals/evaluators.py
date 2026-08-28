@@ -4,6 +4,7 @@ Classes referenced from dataset YAML must also be listed in
 CUSTOM_EVALUATOR_TYPES and passed to ``Dataset.from_file``.
 """
 
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
@@ -33,6 +34,46 @@ def _pairs(hit: Hit) -> set[tuple[str, str]]:
     return {
         (_norm(p.name), _norm(pos.name)) for p in hit.persons for pos in p.positions
     }
+
+
+def _position_fact(
+    position: Position,
+) -> tuple[str, str | None, str | None, str | None, str | None]:
+    """The exact, evaluated fields of one position.
+
+    ``description`` is intentionally informational and excluded.
+    """
+    return (
+        position.name,
+        position.organization,
+        position.jurisdiction,
+        position.start_date,
+        position.end_date,
+    )
+
+
+def _person_fact(
+    person: Person,
+) -> tuple[
+    str,
+    str | None,
+    tuple[str, ...],
+    tuple[tuple[str, str | None, str | None, str | None, str | None], ...],
+]:
+    """The exact, evaluated fields of one person and their holdings.
+
+    Person, country, and position order do not matter. ``bio`` and position
+    ``description`` are intentionally informational and excluded.
+    """
+    positions = tuple(
+        sorted((_position_fact(pos) for pos in person.positions), key=repr)
+    )
+    return person.name, person.dob, tuple(sorted(person.countries)), positions
+
+
+def _graph(hit: Hit) -> Counter[tuple[Any, ...]]:
+    """Order-independent exact person-position graph, preserving duplicates."""
+    return Counter(_person_fact(person) for person in hit.persons)
 
 
 def _f1(expected: set[Any], actual: set[Any]) -> float:
@@ -85,13 +126,14 @@ class InspectionF1(Evaluator[FixtureInput, PageResult]):
 
     Assertions: a ``BrokenSnapshot`` expectation requires a broken output
     (``broken_match``); a ``Miss`` expectation requires a miss output
-    (``miss_match``); a ``Hit`` expectation asserts
-    the exact normalized person set (``persons_match``). Scores: person F1,
-    person-position pair F1, and — over persons and positions matched by
-    normalized name — per-field accuracy for organization, jurisdiction,
+    (``miss_match``); a ``Hit`` expectation requires an order-independent exact
+    match of every structured person and position field except ``bio`` and
+    position ``description`` (``hit_match``). Exact means source spelling,
+    capitalization, punctuation, and nulls are significant. Scores: normalized
+    person F1, person-position pair F1, and — over persons and positions matched
+    by normalized name — per-field accuracy for organization, jurisdiction,
     start_date, end_date, and countries. Non-hit outputs score zero on every
-    graph score. Field scores are informational, never assertions: a debatable
-    label should show up as a sub-1.0 score, not a failed suite.
+    graph score. Scores are informational diagnostics, not assertions.
     """
 
     def evaluate(
@@ -123,7 +165,7 @@ class InspectionF1(Evaluator[FixtureInput, PageResult]):
         assert isinstance(expected, Hit)
         if not isinstance(ctx.output, Hit):
             return {
-                "persons_match": EvaluationReason(
+                "hit_match": EvaluationReason(
                     False, reason=f"output is {ctx.output.kind!r}, not a hit"
                 ),
                 "person_f1": 0.0,
@@ -134,6 +176,10 @@ class InspectionF1(Evaluator[FixtureInput, PageResult]):
                 "end_date_accuracy": 0.0,
                 "countries_accuracy": 0.0,
             }
+        expected_graph = _graph(expected)
+        actual_graph = _graph(ctx.output)
+        missing = list((expected_graph - actual_graph).elements())
+        extra = list((actual_graph - expected_graph).elements())
         expected_persons = _persons(expected)
         actual_persons = _persons(ctx.output)
         matched_persons = [
@@ -151,12 +197,9 @@ class InspectionF1(Evaluator[FixtureInput, PageResult]):
         has_persons = bool(expected.persons)
         has_positions = bool(_pairs(expected))
         return {
-            "persons_match": EvaluationReason(
-                expected_persons.keys() == actual_persons.keys(),
-                reason=(
-                    f"missing={sorted(expected_persons.keys() - actual_persons.keys())} "
-                    f"extra={sorted(actual_persons.keys() - expected_persons.keys())}"
-                ),
+            "hit_match": EvaluationReason(
+                expected_graph == actual_graph,
+                reason=f"missing={missing!r} extra={extra!r}",
             ),
             "person_f1": _f1(set(expected_persons), set(actual_persons)),
             "person_position_f1": _f1(_pairs(expected), _pairs(ctx.output)),
