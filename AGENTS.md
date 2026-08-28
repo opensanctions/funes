@@ -5,7 +5,6 @@ Funes turns web pages into inspection-brief-scoped people/position facts. It emb
 ## Project philosophy
 
 - Early-stage. No backward compatibility, no fallback behaviors. Fail loud: no `try/except` without a specific reason.
-- Development data is disposable. Prefer clean, destructive schema changes over compatibility migrations.
 - Development infrastructure is shared. Do not create ad-hoc databases or browsers for tests.
 
 ## Commands

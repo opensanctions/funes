@@ -228,16 +228,21 @@ def test_import_catalogue_allows_subjects_without_seed_urls():
     assert asyncio.run(run_with_session(scenario)) == (1, 0, 0)
 
 
-def test_import_catalogue_rejects_dataset_semantic_drift():
-    async def scenario(session: AsyncSession) -> None:
+def test_import_catalogue_syncs_dataset_brief():
+    async def scenario(session: AsyncSession) -> str:
         configured = make_definition("one", "Heads", "Organization", {})
         await import_catalogue(session, [configured])
         await session.commit()
         changed = configured.model_copy(update={"people_sought": "Board members"})
-        with pytest.raises(ValueError, match="resolve the drift explicitly"):
-            await import_catalogue(session, [changed])
+        await import_catalogue(session, [changed])
+        await session.commit()
+        return (
+            await session.execute(
+                select(Dataset.people_sought).where(Dataset.name == "one")
+            )
+        ).scalar_one()
 
-    asyncio.run(run_with_session(scenario))
+    assert asyncio.run(run_with_session(scenario)) == "Board members"
 
 
 # --- terminal constructors: aggregate construction against a collecting session ---

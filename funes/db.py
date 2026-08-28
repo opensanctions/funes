@@ -257,7 +257,7 @@ def _upsert_insert(session: AsyncSession):
 
     Production runs on PostgreSQL; the test suite exercises the same
     statements against in-memory SQLite. Both dialects offer
-    ``on_conflict_do_nothing`` with identical semantics.
+    ``on_conflict_do_update`` with identical semantics.
     """
     match session.bind.dialect.name:
         case "postgresql":
@@ -271,31 +271,35 @@ def _upsert_insert(session: AsyncSession):
 async def import_catalogue(
     session: AsyncSession, definitions: list[DatasetDefinition]
 ) -> None:
-    """Append-only import of dataset definitions into the catalogue.
+    """Import dataset definitions into the catalogue.
 
-    Creates missing datasets, subjects, urls, and candidates; existing rows
-    are left untouched (insert-on-conflict does nothing). No updates or
-    deletes are ever performed. An existing dataset whose ``people_sought``
-    or ``subject_label`` differs from configuration fails loudly: drift
-    means the dataset's meaning changed and must be resolved explicitly.
+    Creates missing datasets, subjects, urls, and candidates. The dataset
+    brief columns (``people_sought``, ``subject_label``) are synced to
+    configuration so the YAML files stay the source of truth; subjects,
+    urls, and candidates are append-only. No deletes are ever performed.
     """
     if not definitions:
         return
     insert = _upsert_insert(session)
     names = list(dict.fromkeys(definition.name for definition in definitions))
+    dataset_insert = insert(Dataset).values(
+        [
+            {
+                Dataset.name: definition.name,
+                Dataset.people_sought: definition.people_sought,
+                Dataset.subject_label: definition.subject_label,
+            }
+            for definition in definitions
+        ]
+    )
     await session.execute(
-        insert(Dataset)
-        .values(
-            [
-                {
-                    Dataset.name: definition.name,
-                    Dataset.people_sought: definition.people_sought,
-                    Dataset.subject_label: definition.subject_label,
-                }
-                for definition in definitions
-            ]
+        dataset_insert.on_conflict_do_update(
+            index_elements=[Dataset.name],
+            set_={
+                Dataset.people_sought: dataset_insert.excluded.people_sought,
+                Dataset.subject_label: dataset_insert.excluded.subject_label,
+            },
         )
-        .on_conflict_do_nothing(index_elements=[Dataset.name])
     )
     dataset_by_name = {
         dataset.name: dataset
@@ -303,18 +307,6 @@ async def import_catalogue(
             await session.execute(select(Dataset).where(Dataset.name.in_(names)))
         ).scalars()
     }
-    for definition in definitions:
-        dataset = dataset_by_name[definition.name]
-        for column in ("people_sought", "subject_label"):
-            stored = getattr(dataset, column)
-            configured = getattr(definition, column)
-            if stored != configured:
-                raise ValueError(
-                    f"dataset {definition.name!r} is configured with "
-                    f"{column} {configured!r} but stored as {stored!r}; "
-                    "resolve the drift explicitly (development data is "
-                    "disposable)"
-                )
     configured_subjects = [
         (dataset_by_name[definition.name], subject)
         for definition in definitions
