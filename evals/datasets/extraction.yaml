@@ -162,8 +162,9 @@ cases:
     subject: Northstar Forum
     final_url: https://search.example.net/
   expected_output:
-    kind: broken
-    reason: The capture unexpectedly redirected to an unrelated search portal.
+    kind: miss
+    reason: The URL redirects to an unrelated search portal that contains no Northstar
+      Forum leadership information.
 - name: elections_no_holders
   inputs:
     fixture: elections_no_holders
@@ -381,5 +382,77 @@ cases:
       positions:
       - name: Policy Coordination Department Head
         organization: Caldris Energy Forum
+- name: deep_governance_tables
+  inputs:
+    fixture: deep_governance_tables
+    url: https://www.aurora-array.example.org/governance
+    people_sought: Executive Directorate members and heads of departments
+    subject_label: Organization
+    subject: Aurora Research Array
+  expected_output:
+    kind: hit
+    persons:
+    - name: Dr. Linnea Varga
+      positions:
+      - name: Director-General
+        organization: Aurora Research Array
+    - name: Malik Osei
+      positions:
+      - name: Deputy Director-General
+        organization: Aurora Research Array
+    - name: Ana Petrescu
+      positions:
+      - name: Director of Research
+        organization: Aurora Research Array
+    - name: Tomás Ibarra
+      positions:
+      - name: Chief Information Officer
+        organization: Aurora Research Array
+    - name: Keiko Marin
+      positions:
+      - name: Head of Detector Systems
+        organization: Aurora Research Array
+    - name: Kwame Adusei
+      positions:
+      - name: Head of Data Operations
+        organization: Aurora Research Array
+    - name: Mirela Drago
+      positions:
+      - name: Head of Engineering
+        organization: Aurora Research Array
+    - name: Jonas Falk
+      positions:
+      - name: Head of Scientific Computing
+        organization: Aurora Research Array
+    - name: Samira El-Amin
+      positions:
+      - name: Head of Site Operations
+        organization: Aurora Research Array
+    - name: Peter Ndlovu
+      positions:
+      - name: Head of External Partnerships
+        organization: Aurora Research Array
+- name: structure_link_index
+  inputs:
+    fixture: structure_link_index
+    url: https://www.orinth-bank.example.org/about/structure-management
+    people_sought: Members and officers of the governing bodies
+    subject_label: Organization
+    subject: Orinth Development Bank
+  expected_output:
+    kind: miss
+    reason: The page links to sections about governing bodies and offices but names
+      no human position holders.
+- name: generic_access_denied
+  inputs:
+    fixture: generic_access_denied
+    url: https://www.northwind-forum.example.org/leadership
+    people_sought: Leaders
+    subject_label: Organization
+    subject: Northwind Development Forum
+    http_status: 403
+  expected_output:
+    kind: broken
+    reason: A generic infrastructure access-denied response blocks the public page.
 evaluators:
 - InspectionF1

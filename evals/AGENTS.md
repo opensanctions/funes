@@ -16,15 +16,18 @@ either one.
   brief selects relevant relationships but does not itself establish page facts.
 - Include every source-supported, in-scope person-position holding, including
   historical, future, former, or incidental mentions. Merge duplicate mentions
-  of the same holding, but retain multiple explicitly stated holdings.
+  with an identical source-form name, but do not reconcile spelling variants,
+  aliases, or likely typos; entity resolution belongs to Zavod. Retain multiple
+  explicitly stated holdings and distinct terms of the same office.
 - Preserve source wording exactly for evaluated fields, including capitalization,
-  punctuation, language, and displayed honorifics. Downstream normalization and
-  deduplication belong to Zavod.
+  punctuation, language, displayed honorifics, and apparent source errors.
+  Downstream normalization and interpretation belong to Zavod.
 - Document titles and meta descriptions are valid source evidence.
 - An organization explicitly scoping its own staff or positions may supply the
-  organization for entries beneath it. Do not apply the page organization when
-  the page aggregates multiple organizations, such as unnamed partner
-  representatives.
+  organization for entries beneath it. A named committee, council, chamber, or
+  other sub-body belongs in the position name while the organization remains the
+  explicitly stated parent. Do not apply a page organization when the page
+  aggregates multiple organizations, such as unnamed partner representatives.
 - `jurisdiction` is a source-stated geographic area associated with a holding. It
   may be an office's geographic scope, a constituency, or a geographic home
   authority. An organization, employer, or institution name is not a
@@ -32,13 +35,19 @@ either one.
 - Extract countries only from unambiguous nationality or citizenship statements.
   Origin, residence-like wording, nearby geographic labels, and demonym
   adjectives are insufficient.
-- In an appointment or term roster, a lone year attached to a holding may be
-  treated as its start date. A stated range supplies start and end dates.
+- Date fields contain date expressions, not event-relative prose. In an
+  appointment or term roster, a lone year attached to a holding may be treated as
+  its start date and a stated range supplies start and end dates. Preserve an
+  apparent typo when the source still presents it as a date.
+- URLs, link targets, filenames, and resource paths may guide evidence discovery
+  but cannot alone establish a person-position fact.
 
 Outcome classification and evidence boundaries are implemented by the extraction
 contract in `funes/extract.py`. Blocker fixtures are intentional regression tests
 of the repair-versus-terminal-miss boundary, even when they closely resemble an
-explicit runtime rule.
+explicit runtime rule. Ambiguous access denials lean broken so a future repair
+workflow can retry them. A redirect is not itself an outcome: judge its destination
+as usable content, a terminal miss, or a repairable blocker.
 
 ## Evaluation contract
 
@@ -57,6 +66,12 @@ explicit runtime rule.
 
 - Prefer small captures that isolate one behavior, while retaining enough page
   context to make the expected interpretation defensible.
+- Fixtures inspired by live pages preserve only the abstract structure needed to
+  reproduce a behavior: DOM hierarchy, ordering, evidence relationships, noise,
+  and approximate scale. Replace all real organizations, people, jurisdictions,
+  URLs, dates, distinctive prose, vendor branding, reference identifiers, and
+  source assets. Fixtures must not disclose or copy facts from their live
+  structural examples.
 - Paired cases using one capture with different briefs are especially useful for
   testing scope independently of page understanding.
 - Add messy and less literal cases over time, but retain simple policy regression

@@ -55,10 +55,17 @@ reason.
 
 - Bot challenges, blocking cookie or terms gates, and other click-through
   interstitials are broken.
-- A transient 5xx page with no meaningful source content is broken.
+- Access-denied pages, generic 403 pages, and ambiguous anonymous authorization
+  failures are broken unless they explicitly establish a credential or paid
+  subscription requirement.
+- A transient server or maintenance failure with no meaningful source content
+  is broken, regardless of its HTTP status.
 - A blank, truncated, or garbled render is broken.
-- A capture unexpectedly redirected to a page unrelated to the requested URL
-  is broken, unless the destination is an account or subscription wall.
+
+A redirect is diagnostic, not an outcome. Evaluate the destination normally: a
+usable homepage, parked domain, unrelated portal, or not-found destination is a
+miss; an access blocker or transient error is broken; a credential or
+subscription wall is a miss; and meaningful relevant content remains usable.
 
 Return kind="miss" when the capture establishes that the source is unavailable
 to the repair workflow: a 404 or missing page, parked domain, account-required
@@ -101,25 +108,32 @@ errors, and the brief cannot establish facts.
 - Set organization only when evidence states it, including explicit page-level
   scope. The subject named in the brief is not itself evidence: a hit for the
   right subject may still carry null organization when the page never states
-  the organisation. Prefer a specific outline statement over generic or stale
+  the organisation. A named committee, council, chamber, or other sub-body
+  belongs in the position name while organization remains the explicitly stated
+  parent institution. Prefer a specific outline statement over generic or stale
   metadata.
 - Set jurisdiction only to an explicitly stated geographic area associated
   with the holding, such as the office's geographic scope, a constituency, or
   a geographic home authority. An organisation or employer name is not a
   jurisdiction. Keep a geographic phrase in the position name when the source
   includes it there.
-- Copy date values as written, without surrounding words such as "since",
-  "from", "until", or "took office".
+- Copy recognizable date expressions as written, including apparent source
+  typos, without surrounding words such as "since", "from", "until", or "took
+  office". Event-relative prose without a date, such as "the close of the next
+  session", does not populate a date field.
 - position.description is a short verbatim statement of responsibilities,
   mandate, or remit. Titles, dates, achievements, eligibility, reasons for an
   honour, and departure circumstances are not responsibilities.
 - person.bio is a short contiguous biographical excerpt.
 - person.countries contains only explicit nationalities or citizenships, not
   residence, birthplace, represented country, or a nearby geographic label.
-- Return one Person per distinct human and one Position per distinct holding.
-  Merge repeated details of the same holding. Keep distinct people with the
-  same name separate, and keep explicitly distinct terms of one office as
-  separate positions.
+  Copy the nationality or country value itself without relationship words such
+  as "citizen" or "national".
+- Within one page, merge repeated mentions with an identical source-form name
+  into one Person. Do not reconcile different name strings, even when they look
+  like spelling variants, aliases, or typos. Return one Position per explicitly
+  assigned role or title; merge duplicate details of the same holding, but keep
+  explicitly distinct terms of one office as separate positions.
 - Use null or an empty countries list when a value is not stated.
 
 # Image resources
