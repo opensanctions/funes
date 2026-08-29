@@ -1,42 +1,32 @@
 # Funes
 
-Funes turns web pages into inspection-brief-scoped people/position facts. It embeds [Pravda](https://github.com/opensanctions/pravda) for page capture, queues inspection jobs through Procrastinate, and extracts structured facts with a pydantic-ai agent.
+Political position holders are named across thousands of public websites. The information is public, but it is not really data: it lives in biographies, board pages, organization charts, PDFs, image-heavy rosters, and JavaScript applications.
 
-Early R&D.
+Bespoke scrapers work for prominent sources, but they do not scale across the long tail of courts, regulators, councils, public bodies, and international organizations. This leaves a persistent gap in the coverage of politically exposed persons and other people in public-interest roles.
 
-## How it works
+**Funes is an R&D project investigating whether one evidence-first, automated approach can close that gap.**
 
-YAML seed files define datasets of subjects and their URLs; each subject–URL pair is a candidate. A worker job captures a snapshot of the candidate's page, then an LLM judges the page against the dataset's brief: a **hit** stores the extracted people and positions, a **miss** records why nothing matched, and a broken snapshot is routed aside for repair. Hits are revisited after an interval; misses are not retried.
+> Can we turn the long tail of the public web into structured, reviewable lists of people and the positions they hold—without writing a custom scraper for every institution?
 
-## Setup
+## Evidence first
 
-Requires uv. Copy `.env.example` to `.env`, then:
+Automation makes sources more important, not less. Pages change, captures fail, and model output is probabilistic. An extracted relationship is only useful if we can return to the page as it appeared, inspect it, and apply better extraction methods later.
 
-```bash
-docker compose up -d  # Postgres + headed Chrome
-uv sync
-```
+Funes therefore builds on [Pravda](https://github.com/opensanctions/pravda), which captures and retains rendered web evidence. The evidence remains stable while prompts, models, and pipeline designs evolve. Extracted observations point back to that evidence; an LLM response is never treated as a source in itself.
 
-## Usage
+## What we are trying to learn
 
-```bash
-uv run --env-file .env funes migrate                    # apply schemas, import YAML seed catalogue
-uv run --env-file .env funes enqueue                    # queue one job per due candidate
-uv run --env-file .env procrastinate worker --queues inspect
-```
+The challenge is not whether a model can read one clean leadership page. It is whether an automated system can work reliably, economically, and accountably across the messiness of the real web.
 
-`migrate` is append-only — re-running it imports only new catalogue entries. `enqueue` skips candidates that already have a pending job. Queue state is inspected with Procrastinate's own tooling, e.g. `uv run --env-file .env procrastinate shell list_jobs`.
+Funes explores questions such as:
 
-## Evals
+- How can one approach handle text, images, organization charts, and linked documents?
+- How can it discover which pages are worth monitoring and revisit them cheaply?
+- How can it distinguish an empty result from a blocked or incomplete capture?
+- How tightly can every extracted name and position be grounded in the captured source?
+- How should completeness, correctness, and stability be measured across diverse websites and languages?
 
-The extraction eval suite runs against frozen HTML fixtures with a real model — it costs tokens, so run it deliberately:
+Funes exists to turn these questions into repeatable experiments against real pages and frozen evidence.
 
-```bash
-uv run --env-file .env python -m evals.run [--dataset PATH] [--model NAME] [--case NAME ...]
-```
-
-## Tests
-
-```bash
-uv run --env-file .env pytest
-```
+> [!WARNING]
+> Funes is an early-stage research playground, not a production data pipeline. Its scope and architecture are expected to change as the experiments produce answers.
