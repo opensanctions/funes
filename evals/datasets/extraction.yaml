@@ -637,5 +637,49 @@ cases:
     kind: miss
     reason: The server returns a page-not-found document with HTTP 200 and provides
       no leadership information.
+- name: empty_spa_shell
+  inputs:
+    fixture: empty_spa_shell
+    url: https://www.veyra-coast.example.org/governance/board
+    people_sought: Board members
+    subject_label: Organization
+    subject: Veyra Coastal Authority
+  expected_output:
+    kind: broken
+    reason: The capture has the correct board-page metadata and site shell, but the
+      client-rendered board content is empty.
+- name: stale_metadata_conflict
+  inputs:
+    fixture: stale_metadata_conflict
+    url: https://www.halcyon-relief.example.org/governance
+    people_sought: Executive Board leadership
+    subject_label: Organization
+    subject: Halcyon Relief Network
+  expected_output:
+    kind: hit
+    persons:
+    - name: Nadia Voss
+      positions:
+      - name: Chair of the Executive Board
+        organization: Halcyon Relief Network
+    - name: Anton Mirek
+      positions:
+      - name: Executive Director
+        organization: Halcyon Relief Network
+- name: malformed_source_date
+  inputs:
+    fixture: malformed_source_date
+    url: https://www.vardos-exchange.example.org/secretariat/office
+    people_sought: Secretary-General
+    subject_label: Organization
+    subject: Vardos Cultural Exchange
+  expected_output:
+    kind: hit
+    persons:
+    - name: Laila Omondi
+      positions:
+      - name: Secretary-General
+        organization: Vardos Cultural Exchange
+        start_date: 1st August, 20018
 evaluators:
 - InspectionF1

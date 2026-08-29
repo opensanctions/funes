@@ -60,7 +60,9 @@ reason.
   subscription requirement.
 - A transient server or maintenance failure with no meaningful source content
   is broken, regardless of its HTTP status.
-- A blank, truncated, or garbled render is broken.
+- A blank, truncated, or garbled render is broken. A correct target title or
+  heading plus site navigation and footer does not make a capture usable when
+  the expected client-rendered content region is empty.
 
 A redirect is diagnostic, not an outcome. Evaluate the destination normally: a
 usable homepage, parked domain, unrelated portal, or not-found destination is a
