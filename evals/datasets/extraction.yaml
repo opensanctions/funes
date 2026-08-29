@@ -556,5 +556,86 @@ cases:
       positions:
       - name: Board member
         organization: Solmere Public Health Alliance
+- name: french_commission_leadership
+  inputs:
+    fixture: french_commission_leadership
+    url: https://www.union-estuaires.example.org/fr/gouvernance
+    people_sought: Leadership and commissioners of the Commission
+    subject_label: Organization
+    subject: Union des Estuaires
+  expected_output:
+    kind: hit
+    persons:
+    - name: Son Excellence l’Ambassadrice Dr. Mireille Kanza
+      positions:
+      - name: Présidente de la Commission
+        organization: Union des Estuaires
+        start_date: 1er septembre 2024
+    - name: Étienne M’Bala
+      positions:
+      - name: Vice-Président de la Commission
+        organization: Union des Estuaires
+    - name: Aïcha N’Diaye
+      positions:
+      - name: Commissaire à l’Environnement et aux Estuaires
+        organization: Union des Estuaires
+    - name: João Ferrand
+      positions:
+      - name: Commissaire à la Coopération régionale
+        organization: Union des Estuaires
+    - name: Maëlle Tounkara
+      positions:
+      - name: Commissaire aux Affaires économiques
+        organization: Union des Estuaires
+- name: concatenated_judges
+  inputs:
+    fixture: concatenated_judges
+    url: https://www.nemeris-court.example.org/chambers/second
+    people_sought: President, Vice-President, and judges of the Second Chamber
+    subject_label: Court
+    subject: Nemeris Administrative Court
+  expected_output:
+    kind: hit
+    persons:
+    - name: Dr. Celia Varen
+      positions:
+      - name: President of the Second Chamber
+        organization: Nemeris Administrative Court
+    - name: Omar Neves
+      positions:
+      - name: Vice-President of the Second Chamber
+        organization: Nemeris Administrative Court
+    - name: Nadia Elsen
+      positions:
+      - name: Judge of the Second Chamber
+        organization: Nemeris Administrative Court
+    - name: Mateo Corvin
+      positions:
+      - name: Judge of the Second Chamber
+        organization: Nemeris Administrative Court
+    - name: Łucja Marek
+      positions:
+      - name: Judge of the Second Chamber
+        organization: Nemeris Administrative Court
+    - name: Tәmir Aslan
+      positions:
+      - name: Judge of the Second Chamber
+        organization: Nemeris Administrative Court
+    - name: Éva Sorel
+      positions:
+      - name: Judge of the Second Chamber
+        organization: Nemeris Administrative Court
+- name: soft_not_found
+  inputs:
+    fixture: soft_not_found
+    url: https://www.orbis-council.example.org/about/leadership
+    people_sought: Leaders
+    subject_label: Organization
+    subject: Orbis Cooperation Council
+    http_status: 200
+  expected_output:
+    kind: miss
+    reason: The server returns a page-not-found document with HTTP 200 and provides
+      no leadership information.
 evaluators:
 - InspectionF1

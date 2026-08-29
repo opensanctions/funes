@@ -117,10 +117,11 @@ errors, and the brief cannot establish facts.
   a geographic home authority. An organisation or employer name is not a
   jurisdiction. Keep a geographic phrase in the position name when the source
   includes it there.
-- Copy recognizable date expressions as written, including apparent source
-  typos, without surrounding words such as "since", "from", "until", or "took
-  office". Event-relative prose without a date, such as "the close of the next
-  session", does not populate a date field.
+- Copy explicit calendar-like date expressions and stated numeric terms as
+  written, including apparent source typos, without surrounding words such as
+  "since", "from", "until", or "took office". Date fields must not contain
+  relative event prose such as "the close of the next session" or "the end of
+  the current term"; leave them null when no date is stated.
 - position.description is a short verbatim statement of responsibilities,
   mandate, or remit. Titles, dates, achievements, eligibility, reasons for an
   honour, and departure circumstances are not responsibilities.
@@ -238,11 +239,18 @@ class Position(_StrictModel):
         ),
     )
     start_date: str | None = Field(
-        default=None, description="When the person started, as written on the page."
+        default=None,
+        description=(
+            "Explicit calendar-like date or numeric term for when the person "
+            "started, copied as written. Null for relative event prose."
+        ),
     )
     end_date: str | None = Field(
         default=None,
-        description="When the person left or will leave, as written on the page.",
+        description=(
+            "Explicit calendar-like date or numeric term for when the person left "
+            "or will leave, copied as written. Null for relative event prose."
+        ),
     )
 
 
