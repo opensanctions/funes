@@ -32,7 +32,7 @@ uv run --env-file .env procrastinate worker --queues inspect
 The extraction eval suite runs against frozen HTML fixtures with a real model — it costs tokens, so run it deliberately:
 
 ```bash
-uv run --env-file .env python -m evals.run [--dataset PATH] [--model NAME]
+uv run --env-file .env python -m evals.run [--dataset PATH] [--model NAME] [--case NAME ...]
 ```
 
 ## Tests

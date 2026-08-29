@@ -6,6 +6,7 @@ real captures. Unlike the pytest suite, this hits a real model and costs tokens 
 run it deliberately:
 
     uv run --env-file .env python -m evals.run [--dataset PATH] [--model NAME]
+        [--case NAME ...]
 
 Exit status is nonzero when a case fails, raises, or an evaluator crashes.
 """
@@ -36,12 +37,25 @@ def main() -> int:
         default=None,
         help="model id (provider:model); defaults to MODEL from the environment",
     )
+    parser.add_argument(
+        "--case",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="run only this case; may be supplied more than once",
+    )
     args = parser.parse_args()
     model = args.model or load_config().model.name
 
     dataset = Dataset[FixtureInput, PageResult, NoneType].from_file(
         args.dataset, custom_evaluator_types=CUSTOM_EVALUATOR_TYPES
     )
+    if args.case:
+        requested = set(args.case)
+        available = {case.name for case in dataset.cases}
+        if unknown := requested - available:
+            parser.error("unknown case(s): " + ", ".join(sorted(unknown)))
+        dataset.cases = [case for case in dataset.cases if case.name in requested]
     report = dataset.evaluate_sync(
         partial(extract, model=model), name=f"inspection:{model}", progress=False
     )

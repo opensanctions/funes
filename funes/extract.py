@@ -36,7 +36,7 @@ Follow these steps in order:
    return kind="broken" and stop. If it establishes terminal unavailability,
    return kind="miss" and stop.
 2. Read the entire usable source, including metadata and the full outline.
-   View relevant captured images when needed.
+   Inspect captured images according to the image-resource policy below.
 3. Check the subject: unless the page concerns the subject named in the
    brief, return kind="miss" naming the subject the page does concern.
 4. Find every supported person-position relationship covered by the brief.
@@ -141,11 +141,15 @@ errors, and the brief cannot establish facts.
 
 # Image resources
 
-An image may have a [body=...] path. Call view_resource with that exact path
-when the surrounding context suggests the image contains relevant names or
-positions, such as a roster or organization chart. Link targets may guide the
-choice but are not evidence. Skip portraits, logos, decorative images, and
-images whose relevant facts already appear in text.
+For a usable page, before returning a hit or a content-based miss, view every
+image that could materially affect whether the page satisfies the brief or
+whether every in-scope person-position relationship has been found. An image is
+safe to skip only when its surrounding context establishes that it is out of
+scope, or when any potentially relevant facts it contains are already fully
+supported by the text or a previously viewed image. Treat portraits,
+photographs, and cards as potentially evidentiary because they may contain
+overlaid names or titles. Link targets may guide resource selection but are not
+evidence.
 
 # Examples
 
@@ -335,11 +339,13 @@ class ExtractionDependencies:
 async def view_resource(
     ctx: RunContext[ExtractionDependencies], body_path: str
 ) -> BinaryContent:
-    """View one captured image resource referenced by a ``[body=...]`` path.
+    """Inspect a captured image referenced by an outline ``[body=...]`` path.
 
-    Returns the image bytes as ``BinaryContent`` so the model can read them.
-    Retries (not fails) when the model names a body path with no stored HAR
-    body or asks for a resource whose media type cannot be viewed.
+    Use this when the image may contain evidence needed to evaluate the page or
+    complete its in-scope person-position relationships. Pass the exact body
+    path; this tool cannot fetch an arbitrary URL. It returns the captured image
+    for visual inspection and requests a retry for a missing or unsupported
+    resource.
     """
     media_type = ctx.deps.resource_media_types.get(body_path)
     if media_type is None:
