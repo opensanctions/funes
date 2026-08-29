@@ -454,5 +454,107 @@ cases:
   expected_output:
     kind: broken
     reason: A generic infrastructure access-denied response blocks the public page.
+- name: mixed_scope_governing_board
+  inputs:
+    fixture: mixed_scope_rosters
+    url: https://www.lydian-water.example.org/governance
+    people_sought: Members of the Board of Trustees
+    subject_label: Organization
+    subject: Lydian Water Foundation
+  expected_output:
+    kind: hit
+    persons:
+    - name: Amara Nwosu
+      positions:
+      - name: Chair of the Board
+        organization: Lydian Water Foundation
+    - name: Lukas Venn
+      positions:
+      - name: Trustee
+        organization: Lydian Water Foundation
+    - name: Sofía Belmonte
+      positions:
+      - name: Trustee
+        organization: Lydian Water Foundation
+    - name: Idris Kader
+      positions:
+      - name: Trustee
+        organization: Lydian Water Foundation
+- name: mixed_scope_advisory_panel
+  inputs:
+    fixture: mixed_scope_rosters
+    url: https://www.lydian-water.example.org/governance
+    people_sought: Members of the Scientific Advisory Panel
+    subject_label: Organization
+    subject: Lydian Water Foundation
+  expected_output:
+    kind: hit
+    persons:
+    - name: Eleri Moss
+      positions:
+      - name: Chair, Scientific Advisory Panel
+        organization: Lydian Water Foundation
+    - name: Ravi Mensah
+      positions:
+      - name: Member, Scientific Advisory Panel
+        organization: Lydian Water Foundation
+    - name: Clara Jovan
+      positions:
+      - name: Member, Scientific Advisory Panel
+        organization: Lydian Water Foundation
+- name: repeated_terms_table
+  inputs:
+    fixture: repeated_terms_table
+    url: https://www.astrean-tribunal.example.org/presidency
+    people_sought: Presidents and Vice-Presidents
+    subject_label: Court
+    subject: Astrean Maritime Tribunal
+  expected_output:
+    kind: hit
+    persons:
+    - name: Elif Karadag
+      positions:
+      - name: Vice-President
+        organization: Astrean Maritime Tribunal
+        start_date: '2018'
+        end_date: '2021'
+      - name: Vice-President
+        organization: Astrean Maritime Tribunal
+        start_date: '2024'
+        end_date: '2027'
+      - name: President
+        organization: Astrean Maritime Tribunal
+        start_date: '2027'
+        end_date: '2030'
+- name: roster_among_portraits
+  inputs:
+    fixture: roster_among_portraits
+    url: https://www.solmere-health.example.org/governance/executive-board
+    people_sought: Members of the Executive Board
+    subject_label: Organization
+    subject: Solmere Public Health Alliance
+  expected_output:
+    kind: hit
+    persons:
+    - name: Dr. Imani Kessler
+      positions:
+      - name: Chair
+        organization: Solmere Public Health Alliance
+    - name: Paulo Neri
+      positions:
+      - name: Vice Chair
+        organization: Solmere Public Health Alliance
+    - name: Mei Tanaka
+      positions:
+      - name: Treasurer
+        organization: Solmere Public Health Alliance
+    - name: Amina Fors
+      positions:
+      - name: Board member
+        organization: Solmere Public Health Alliance
+    - name: Leo Markovic
+      positions:
+      - name: Board member
+        organization: Solmere Public Health Alliance
 evaluators:
 - InspectionF1
