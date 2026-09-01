@@ -3,9 +3,9 @@
 import os
 
 
-def session_path(base_path: str, run_id: str) -> str:
+def session_path(base_path: str, agent: str, run_id: str) -> str:
     """Return the JSON path for one agent session inside ``base_path``."""
-    return os.path.join(base_path, f"{run_id}.json")
+    return os.path.join(base_path, agent, f"{run_id}.json")
 
 
 def write_session(path: str, messages_json: bytes) -> None:

@@ -11,11 +11,17 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-from funes.sessions import write_session
+from funes.sessions import session_path, write_session
+
+
+def test_session_path_is_per_agent():
+    assert session_path("/sessions", "inspector", "run-1") == str(
+        Path("/sessions") / "inspector" / "run-1.json"
+    )
 
 
 def test_write_session_creates_directories_and_round_trips(tmp_path):
-    path = str(tmp_path / "nested" / "dir" / "run-1.json")
+    path = session_path(str(tmp_path), "inspector", "run-1")
     messages = [
         ModelRequest(parts=[UserPromptPart(content="extract this page")]),
         ModelResponse(parts=[TextPart("done")], model_name="test"),
@@ -29,7 +35,7 @@ def test_write_session_creates_directories_and_round_trips(tmp_path):
 def test_write_session_round_trips_binary_tool_returns(tmp_path):
     # Sessions written after a view_resource call carry image bytes; they
     # must survive the JSON round trip production uses for replay.
-    path = str(tmp_path / "run-2.json")
+    path = session_path(str(tmp_path), "inspector", "run-2")
     binary = BinaryContent(b"\x89PNG-fake", media_type="image/png")
     messages = [
         ModelRequest(
