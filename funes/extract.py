@@ -211,9 +211,8 @@ other entity. Every selected link becomes an inspection job of its own.
   and leadership pages, former-officeholder pages, and organization charts.
 - Skip navigation, footer, login, print, social-media, and
   language-switcher links, and links clearly unrelated to the subject.
-- Be inclusive of plausible links: when a link could plausibly lead to
-  brief-covered people, select it rather than skip it, because unselected
-  links are never inspected.
+- Be inclusive of plausible links: selected links become real inspection
+  jobs, so select a link when it could plausibly lead to brief-covered people.
 - Give a one-sentence reason for each selection naming what the link
   appears to lead to.
 """
