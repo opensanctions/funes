@@ -633,9 +633,10 @@ def test_discovery_agent_function_model_retries_invalid_output():
 
 def test_build_discovery_prompt_enumerates_urls_and_anchor_text():
     links = [
-        CandidateLink(url="https://example.org/board", text="Board of Directors"),
-        CandidateLink(url="https://example.org/team?ref=nav", text="Our Team"),
-        CandidateLink(url="https://example.org/müller", text="Vorstand (Müller)"),
+        CandidateLink(url="https://example.org/board", anchor="Board of Directors"),
+        CandidateLink(url="https://example.org/team?ref=nav", anchor="Our Team"),
+        CandidateLink(url="https://example.org/müller", anchor="Vorstand (Müller)"),
+        CandidateLink(url="https://example.org/img-logo", anchor=None),
     ]
     prompt = build_discovery_prompt(links)
     assert prompt.startswith("<candidate_links>\n")
@@ -646,6 +647,8 @@ def test_build_discovery_prompt_enumerates_urls_and_anchor_text():
     assert 'Anchor text: "Our Team"' in prompt
     assert "3. URL: https://example.org/müller" in prompt
     assert 'Anchor text: "Vorstand (Müller)"' in prompt
+    assert "4. URL: https://example.org/img-logo" in prompt
+    assert "Anchor text: null" in prompt
     # No page context beyond the links themselves.
     assert "<page_outline>" not in prompt
     assert "<page_snapshot>" not in prompt

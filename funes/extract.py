@@ -472,14 +472,19 @@ def build_discovery_prompt(links: list[CandidateLink]) -> str:
     travels separately as run instructions.
     """
     entries = "".join(
-        f"{index}. URL: {link.url}\n   Anchor text: {_quote_anchor(link.text)}\n"
+        f"{index}. URL: {link.url}\n   Anchor text: {_quote_anchor(link.anchor)}\n"
         for index, link in enumerate(links, start=1)
     )
     return f"<candidate_links>\n{entries}</candidate_links>"
 
 
-def _quote_anchor(text: str) -> str:
-    """Quote anchor text as a JSON string, keeping non-ASCII readable."""
+def _quote_anchor(text: str | None) -> str:
+    """Quote anchor text as a JSON string, keeping non-ASCII readable.
+
+    A link with no anchor text renders as JSON ``null``.
+    """
+    if text is None:
+        return "null"
     return json.dumps(text, ensure_ascii=False)
 
 

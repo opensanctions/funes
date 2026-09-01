@@ -139,7 +139,9 @@ async def inspect_candidate(candidate_id: str) -> None:
                 run_id=str(attempt_id),
                 deps=deps,
             )
-            session_file = session_path(config.sessions.base_path, str(attempt_id))
+            session_file = session_path(
+                config.sessions.base_path, "extraction", str(attempt_id)
+            )
 
             if isinstance(run.output, BrokenSnapshot):
                 reason = run.output.reason
