@@ -30,7 +30,8 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
-from funes.extract import Hit, LinkSelection, Miss
+from funes.discovery import LinkSelection
+from funes.extract import Hit, Miss
 from funes.sources import DatasetDefinition
 
 

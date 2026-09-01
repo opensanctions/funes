@@ -6,8 +6,8 @@ from pathlib import Path
 from pydantic_ai.models import Model
 
 from evals.models import FixtureInput
+from funes.agents import Brief
 from funes.extract import (
-    Brief,
     ExtractionDependencies,
     PageResult,
     build_prompt,

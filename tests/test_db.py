@@ -30,7 +30,8 @@ from funes.db import (
     store_discovered_candidates,
     store_inspection,
 )
-from funes.extract import Hit, LinkSelection, Miss
+from funes.discovery import LinkSelection
+from funes.extract import Hit, Miss
 from funes.extract import Person as PersonResult
 from funes.extract import Position as PositionResult
 from funes.sources import DatasetDefinition, SubjectDefinition

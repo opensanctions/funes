@@ -16,27 +16,22 @@ from pydantic_ai.messages import (
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 
+from funes.agents import Brief, render_brief
+from funes.discovery import discovery_agent
 from funes.extract import (
-    Brief,
     BrokenSnapshot,
-    Discovery,
     ExtractionDependencies,
     Hit,
-    LinkSelection,
     Miss,
     PageMetadata,
     PageResult,
     Person,
     Position,
-    build_discovery_prompt,
     build_prompt,
-    discovery_agent,
     extraction_agent,
     metadata_from_html,
-    render_brief,
     view_resource,
 )
-from funes.outline import CandidateLink
 
 result_adapter = TypeAdapter(PageResult)
 
@@ -496,51 +491,7 @@ def test_metadata_from_html_empty_page():
     assert metadata.capture_error is None
 
 
-# --- discovery schema ---
-
-
-def test_link_selection_requires_nonblank_url_and_reason():
-    selection = LinkSelection(
-        url="  https://example.org/board  ",
-        reason="  Lists the foundation's board.  ",
-    )
-    assert selection.url == "https://example.org/board"
-    assert selection.reason == "Lists the foundation's board."
-    with pytest.raises(ValidationError):
-        LinkSelection(url="https://example.org", reason="")
-    with pytest.raises(ValidationError):
-        LinkSelection(url="   ", reason="Lists the board.")
-    with pytest.raises(ValidationError):
-        LinkSelection(url="https://example.org")
-    with pytest.raises(ValidationError):
-        LinkSelection(url="https://example.org", reason="ok", unexpected=True)
-
-
-def test_discovery_is_strict_without_length_limits():
-    discovery = Discovery(
-        selections=[
-            LinkSelection(url="https://example.org/a", reason="Roster of members."),
-            LinkSelection(url="https://example.org/b", reason="Leadership team page."),
-        ]
-    )
-    assert [s.url for s in discovery.selections] == [
-        "https://example.org/a",
-        "https://example.org/b",
-    ]
-    # No minimum or maximum on the selection count.
-    assert Discovery(selections=[]).selections == []
-    many = Discovery(
-        selections=[
-            LinkSelection(url=f"https://example.org/{i}", reason=f"Reason {i}.")
-            for i in range(50)
-        ]
-    )
-    assert len(many.selections) == 50
-    with pytest.raises(ValidationError):
-        Discovery(selections=[], unexpected=True)
-
-
-# --- discovery agent runs ---
+# --- shared brief instructions ---
 
 
 _BRIEF = Brief(
@@ -548,117 +499,6 @@ _BRIEF = Brief(
     subject_label="Organization",
     subject="Example Foundation",
 )
-
-_SELECTIONS = {
-    "selections": [
-        {
-            "url": "https://example.org/board",
-            "reason": "Likely the foundation's board roster.",
-        },
-        {
-            "url": "https://example.org/about/leadership",
-            "reason": "Leadership page may name current directors.",
-        },
-    ]
-}
-
-
-def test_discovery_agent_function_model_returns_selections():
-    def fn(messages, info):
-        return ModelResponse(parts=[TextPart(json.dumps(_SELECTIONS))])
-
-    with discovery_agent.override(model=FunctionModel(fn)):
-        result = asyncio.run(
-            discovery_agent.run(
-                "<candidate_links>ignored</candidate_links>", deps=_BRIEF
-            )
-        )
-
-    assert isinstance(result.output, Discovery)
-    assert [s.url for s in result.output.selections] == [
-        "https://example.org/board",
-        "https://example.org/about/leadership",
-    ]
-    assert result.output.selections[0].reason == "Likely the foundation's board roster."
-
-
-def test_discovery_agent_test_model_produces_valid_output():
-    test_model = TestModel(
-        profile={"supports_json_schema_output": True},
-        custom_output_text=json.dumps(_SELECTIONS),
-    )
-    with discovery_agent.override(model=test_model):
-        result = asyncio.run(
-            discovery_agent.run(
-                "<candidate_links>ignored</candidate_links>", deps=_BRIEF
-            )
-        )
-
-    assert isinstance(result.output, Discovery)
-    assert len(result.output.selections) == 2
-    assert isinstance(result.output.selections[0], LinkSelection)
-
-
-def test_discovery_agent_function_model_retries_invalid_output():
-    def fn(messages, info):
-        if any(
-            isinstance(p, RetryPromptPart)
-            for m in messages
-            for p in getattr(m, "parts", [])
-        ):
-            return ModelResponse(parts=[TextPart(json.dumps(_SELECTIONS))])
-        return ModelResponse(
-            parts=[TextPart(json.dumps({"selections": [{"url": ""}]}))]
-        )
-
-    with discovery_agent.override(model=FunctionModel(fn)):
-        result = asyncio.run(
-            discovery_agent.run(
-                "<candidate_links>ignored</candidate_links>", deps=_BRIEF
-            )
-        )
-
-    assert isinstance(result.output, Discovery)
-    retries = [
-        p
-        for m in result.all_messages()
-        for p in getattr(m, "parts", [])
-        if isinstance(p, RetryPromptPart)
-    ]
-    assert retries
-
-
-# --- discovery prompt construction ---
-
-
-def test_build_discovery_prompt_enumerates_urls_and_anchor_text():
-    links = [
-        CandidateLink(url="https://example.org/board", anchor="Board of Directors"),
-        CandidateLink(url="https://example.org/team?ref=nav", anchor="Our Team"),
-        CandidateLink(url="https://example.org/müller", anchor="Vorstand (Müller)"),
-        CandidateLink(url="https://example.org/img-logo", anchor=None),
-    ]
-    prompt = build_discovery_prompt(links)
-    assert prompt.startswith("<candidate_links>\n")
-    assert prompt.endswith("\n</candidate_links>")
-    assert "1. URL: https://example.org/board" in prompt
-    assert 'Anchor text: "Board of Directors"' in prompt
-    assert "2. URL: https://example.org/team?ref=nav" in prompt
-    assert 'Anchor text: "Our Team"' in prompt
-    assert "3. URL: https://example.org/müller" in prompt
-    assert 'Anchor text: "Vorstand (Müller)"' in prompt
-    assert "4. URL: https://example.org/img-logo" in prompt
-    assert "Anchor text: null" in prompt
-    # No page context beyond the links themselves.
-    assert "<page_outline>" not in prompt
-    assert "<page_snapshot>" not in prompt
-
-
-def test_build_discovery_prompt_without_links():
-    assert build_discovery_prompt([]) == "<candidate_links>\n</candidate_links>"
-
-
-# --- shared brief instructions ---
 
 
 def test_both_agents_receive_the_same_brief_instructions():

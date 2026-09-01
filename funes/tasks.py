@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import selectinload
 
 from funes import db
+from funes.agents import Brief
 from funes.capture import (
     artifact_filesystem,
     first_error_line,
@@ -17,21 +18,22 @@ from funes.capture import (
     pravda_client,
     read_artifact,
 )
+from funes.discovery import (
+    build_discovery_prompt,
+    candidate_links,
+    discovery_agent,
+)
 from funes.extract import (
-    Brief,
     BrokenSnapshot,
     ExtractionDependencies,
     Hit,
     Miss,
-    build_discovery_prompt,
     build_prompt,
-    discovery_agent,
     extraction_agent,
     metadata_from_html,
 )
 from funes.outline import (
     build_outline,
-    candidate_links,
     har_resource_media_types,
 )
 from funes.procrastinate import app, config

@@ -1,16 +1,15 @@
 """LLM extraction schema, prompts, and the Pydantic AI extraction agent."""
 
-import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
 from bs4 import BeautifulSoup
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import Field
 from pydantic_ai import Agent, BinaryContent, ModelRetry, NativeOutput, RunContext
 
-from funes.outline import CandidateLink
+from funes.agents import Brief, NonBlank, StrictModel, render_brief
 
 log = logging.getLogger("funes")
 
@@ -194,38 +193,7 @@ Output: {"kind":"miss","reason":"The page is an account-required login wall."}
 """
 
 
-_DISCOVERY_INSTRUCTIONS = """\
-# Identity
-
-You select follow-up links from one captured web page against a trusted
-runtime brief: the people sought name the class of position holders, and the
-labeled subject scopes the search to one organization, country, court, or
-other entity. Every selected link becomes an inspection job of its own.
-
-# Selection policy
-
-- Select only from the enumerated candidate links, copying each URL exactly
-  as written. Never construct, modify, or guess a URL.
-- Select links likely to lead to pages naming people covered by the brief:
-  rosters and membership lists, individual biographies and profiles, team
-  and leadership pages, former-officeholder pages, and organization charts.
-- Skip navigation, footer, login, print, social-media, and
-  language-switcher links, and links clearly unrelated to the subject.
-- Be inclusive of plausible links: selected links become real inspection
-  jobs, so select a link when it could plausibly lead to brief-covered people.
-- Give a one-sentence reason for each selection naming what the link
-  appears to lead to.
-"""
-
-
-class _StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-
-_NonBlank = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-
-
-class PageMetadata(_StrictModel):
+class PageMetadata(StrictModel):
     """Small, explicit slice of page metadata supplied to the model."""
 
     requested_url: str
@@ -238,8 +206,8 @@ class PageMetadata(_StrictModel):
 
 # Structured-output schema for extraction. Nested: a Person holds many
 # Positions; person-level facts live on the person.
-class Position(_StrictModel):
-    name: _NonBlank = Field(
+class Position(StrictModel):
+    name: NonBlank = Field(
         description=(
             "Position title supported by source wording. Preserve it exactly, "
             "except for the permitted minimal conversion of an unambiguous "
@@ -287,8 +255,8 @@ class Position(_StrictModel):
     )
 
 
-class Person(_StrictModel):
-    name: _NonBlank = Field(
+class Person(StrictModel):
+    name: NonBlank = Field(
         description=(
             "Person's name exactly as written. Preserve displayed honorifics and "
             "do not expand initials."
@@ -314,7 +282,7 @@ class Person(_StrictModel):
     )
 
 
-class Hit(_StrictModel):
+class Hit(StrictModel):
     """The snapshot satisfies the brief: at least one person-position
     relationship relevant to it."""
 
@@ -328,7 +296,7 @@ class Hit(_StrictModel):
     )
 
 
-class Miss(_StrictModel):
+class Miss(StrictModel):
     """Terminal inspection result with no brief-matching relationship.
 
     The capture either supplies usable but irrelevant content or establishes
@@ -337,57 +305,19 @@ class Miss(_StrictModel):
     """
 
     kind: Literal["miss"] = "miss"
-    reason: _NonBlank = Field(
+    reason: NonBlank = Field(
         description="What the captured page is and why it does not meet the brief."
     )
 
 
-class BrokenSnapshot(_StrictModel):
+class BrokenSnapshot(StrictModel):
     """Nonterminal capture failure eligible for supported recapture."""
 
     kind: Literal["broken"] = "broken"
-    reason: _NonBlank = Field(description="The observed condition blocking content.")
+    reason: NonBlank = Field(description="The observed condition blocking content.")
 
 
 PageResult = Annotated[Hit | Miss | BrokenSnapshot, Field(discriminator="kind")]
-
-
-class LinkSelection(_StrictModel):
-    """One candidate URL chosen for a follow-up inspection job."""
-
-    url: _NonBlank = Field(
-        description="Candidate URL copied exactly as enumerated.",
-    )
-    reason: _NonBlank = Field(
-        description=(
-            "One sentence naming what this link appears to lead to and why it "
-            "may name brief-covered people."
-        ),
-    )
-
-
-class Discovery(_StrictModel):
-    """The links selected from one page's candidate links."""
-
-    selections: list[LinkSelection] = Field(
-        description="Every candidate link worth inspecting, with its reason.",
-    )
-
-
-@dataclass(frozen=True)
-class Brief:
-    """Trusted per-dataset selection brief, shared by all agents."""
-
-    people_sought: str
-    subject_label: str
-    subject: str
-
-
-def render_brief(brief: Brief) -> str:
-    """Render the trusted brief as dynamic instructions for any agent."""
-    return (
-        f"People sought: {brief.people_sought}\n{brief.subject_label}: {brief.subject}"
-    )
 
 
 @dataclass(frozen=True)
@@ -444,47 +374,6 @@ extraction_agent: Agent[ExtractionDependencies, PageResult] = Agent(
 def _inspection_brief(ctx: RunContext[ExtractionDependencies]) -> str:
     """Render the run's trusted selection brief as dynamic instructions."""
     return render_brief(ctx.deps.brief)
-
-
-# The discovery agent picks follow-up links from a captured page against the
-# same brief. It runs in a fresh context with no tools: the prompt carries
-# only the enumerated candidate links.
-discovery_agent: Agent[Brief, Discovery] = Agent(
-    name="discovery",
-    output_type=NativeOutput(Discovery, strict=True),
-    instructions=_DISCOVERY_INSTRUCTIONS,
-    model_settings={"thinking": "low"},
-    deps_type=Brief,
-)
-
-
-@discovery_agent.instructions
-def _discovery_brief(ctx: RunContext[Brief]) -> str:
-    """Render the run's trusted selection brief as dynamic instructions."""
-    return render_brief(ctx.deps)
-
-
-def build_discovery_prompt(links: list[CandidateLink]) -> str:
-    """Build one user message enumerating the page's candidate links.
-
-    The prompt carries the untrusted link list only; the trusted brief
-    travels separately as run instructions.
-    """
-    entries = "".join(
-        f"{index}. URL: {link.url}\n   Anchor text: {_quote_anchor(link.anchor)}\n"
-        for index, link in enumerate(links, start=1)
-    )
-    return f"<candidate_links>\n{entries}</candidate_links>"
-
-
-def _quote_anchor(text: str | None) -> str:
-    """Quote anchor text as a JSON string, keeping non-ASCII readable.
-
-    A link with no anchor text renders as JSON ``null``.
-    """
-    if text is None:
-        return "null"
-    return json.dumps(text, ensure_ascii=False)
 
 
 def build_prompt(metadata: PageMetadata, outline: str) -> str:

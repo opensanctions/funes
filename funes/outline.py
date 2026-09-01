@@ -12,66 +12,19 @@ Example::
 """
 
 import json
-import logging
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from urllib.parse import quote, urldefrag, urljoin
+from urllib.parse import quote, urljoin
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 
 # Elements whose content never reaches the rendered page.
 SKIP_TAGS = frozenset({"head", "script", "style", "noscript", "template"})
 
-# Upper bound on links returned by candidate_links.
-MAX_CANDIDATE_LINKS = 200
-
 
 def _require_http_base(url: str) -> None:
     if not url.startswith(("http://", "https://")):
         raise ValueError(f"outline base URL must be absolute http(s), got {url!r}")
-
-
-@dataclass(frozen=True)
-class CandidateLink:
-    """One link worth offering as a next-inspection candidate."""
-
-    url: str
-    anchor: str | None
-
-
-def candidate_links(final_url: str, html: str) -> list[CandidateLink]:
-    """Extract http(s) links from *html*, resolved against *final_url*.
-
-    Fragments are stripped; query parameters are kept. Links deduplicate by
-    URL in DOM order, and at most :data:`MAX_CANDIDATE_LINKS` are returned.
-    """
-    _require_http_base(final_url)
-    soup = BeautifulSoup(html, "html.parser")
-    links: list[CandidateLink] = []
-    seen: set[str] = set()
-    for anchor in soup.find_all("a"):
-        href = anchor.get("href")
-        if not isinstance(href, str):
-            continue
-        url, _fragment = urldefrag(urljoin(final_url, href))
-        if not url.startswith(("http://", "https://")) or url in seen:
-            continue
-        seen.add(url)
-        links.append(CandidateLink(url=url, anchor=_anchor_text(anchor)))
-    if len(links) > MAX_CANDIDATE_LINKS:
-        logging.getLogger(__name__).warning(
-            "candidate links capped at %d of %d for %s",
-            MAX_CANDIDATE_LINKS,
-            len(links),
-            final_url,
-        )
-    return links[:MAX_CANDIDATE_LINKS]
-
-
-def _anchor_text(anchor: Tag) -> str | None:
-    """Whitespace-collapsed anchor text, or ``None`` when blank."""
-    text = _normalize(anchor.get_text(" "))
-    return text or None
 
 
 def build_outline(url: str, html: str, http_archive: dict | None = None) -> str:
