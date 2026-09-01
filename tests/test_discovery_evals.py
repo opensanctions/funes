@@ -31,6 +31,15 @@ def dataset() -> Dataset[FixtureInput, Discovery, NoneType]:
 def test_dataset_loads_with_direct_hit_cases(dataset):
     assert dataset.evaluators == [DiscoveryLinkSet()]
     assert {case.name for case in dataset.cases} == {
+        "governance_hub_to_holder_pages",
+        "secretariat_team_amid_out_of_scope_links",
+        "secretary_general_profile_to_deputies",
+        "court_council_to_members_and_secretary_general",
+        "current_profile_to_directors_and_former_holders",
+        "parent_secretariat_scope",
+        "sibling_program_scope",
+        "profile_links_board_scope",
+        "profile_links_advisory_scope",
         "direct_directory_and_profiles",
         "no_stepping_stones",
         "wrong_subject",

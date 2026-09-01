@@ -1,5 +1,126 @@
 name: discovery
 cases:
+- name: governance_hub_to_holder_pages
+  inputs:
+    fixture: discovery_governance_hub
+    url: https://www.asteria.example.org/about/governance
+    people_sought: Director-General, deputy heads, and members of the governing Council
+    subject_label: Organization
+    subject: Asteria Conservation Union
+  expected_output:
+    selections:
+    - url: https://www.asteria.example.org/governance/president-and-council
+      reason: The Council link is paired with an image of Council members and the Director-General, indicating a direct page about the covered President and Council holders.
+    - url: https://www.asteria.example.org/union/secretariat-and-director-general
+      reason: The Secretariat section links specifically to its Director-General, indicating a direct source about the covered Secretariat leadership.
+- name: secretariat_team_amid_out_of_scope_links
+  inputs:
+    fixture: discovery_secretariat_menu
+    url: https://www.mcsc.example.org/about/secretariat
+    people_sought: Chair, Coordinator-General, deputy heads, and directors; not advisory-body members, advisers, or staff
+    subject_label: Organization
+    subject: Ministerial Council for Scientific Cooperation
+  expected_output:
+    selections:
+    - url: https://www.mcsc.example.org/about/our-team
+      reason: The subject's Team destination is a direct personnel listing in a Secretariat context that identifies the covered Coordinator-General as chief executive.
+- name: secretary_general_profile_to_deputies
+  inputs:
+    fixture: discovery_secretary_general_profile
+    url: https://www.lrc.example.org/what-we-do/secretary-general
+    people_sought: Secretary-General and Deputy Secretaries-General
+    subject_label: Organization
+    subject: Lydora Regional Community
+  expected_output:
+    selections:
+    - url: https://www.lrc.example.org/what-we-do/secretary-general/deputy-secretaries-general
+      reason: The related-resources link leads directly to a page about the subject's covered Deputy Secretaries-General, unlike the neighboring speech and institutional links.
+- name: court_council_to_members_and_secretary_general
+  inputs:
+    fixture: discovery_court_council
+    url: https://www.aca.example.org/en/about/introduction/administrative-council/
+    people_sought: Secretary-General, members of the Court, and presidents of the Administrative Council
+    subject_label: Court
+    subject: Aurelian Court of Arbitration
+  expected_output:
+    selections:
+    - url: https://www.aca.example.org/en/about/introduction/members-of-the-court/
+      reason: The Members of the Court destination is presented as a direct composition source for a covered body.
+    - url: https://www.aca.example.org/en/about/introduction/secretary-general/
+      reason: The Secretary-General destination directly concerns the Court's covered head office.
+- name: current_profile_to_directors_and_former_holders
+  inputs:
+    fixture: discovery_secretariat_sidebar
+    url: https://www.nprc.example.org/secretary-general
+    people_sought: Secretary-General and directors, including former holders
+    subject_label: Organization
+    subject: Neridian Partnership for Regional Cooperation
+  expected_output:
+    selections:
+    - url: https://www.nprc.example.org/former-secretaries-general
+      reason: The plural Former Secretaries-General destination is presented as a direct historical holder source.
+    - url: https://www.nprc.example.org/directors
+      reason: The Directors destination directly identifies a covered class of current officeholders.
+    - url: https://www.nprc.example.org/former-directors
+      reason: The Former Directors destination directly identifies a covered class of historical officeholders.
+    - url: https://www.nprc.example.org/former-secretary-general
+      reason: The Former Secretary-General destination directly concerns a historical holder of the covered head office.
+- name: parent_secretariat_scope
+  inputs:
+    fixture: discovery_parent_secretariat_structure
+    url: https://www.lrc.example.org/secretariat/organizational-structure
+    people_sought: Secretary-General and directors of the Secretariat
+    subject_label: Organization
+    subject: Lydora Regional Community
+  expected_output:
+    selections:
+    - url: https://www.lrc.example.org/what-we-do/secretary-general
+      reason: The Secretary-General of LRC destination directly concerns the parent organization's covered head office.
+- name: sibling_program_scope
+  inputs:
+    fixture: discovery_parent_secretariat_structure
+    url: https://www.lrc.example.org/secretariat/organizational-structure
+    people_sought: Leadership of the free trade programme
+    subject_label: Organization
+    subject: Lydora Free Trade Area
+  expected_output:
+    selections: []
+- name: profile_links_board_scope
+  inputs:
+    fixture: discovery_governance_profiles
+    url: https://www.emp.example.org/our-people/governance
+    people_sought: Board members and Executive Director
+    subject_label: Organization
+    subject: Equinox Medicines Partnership
+  expected_output:
+    selections:
+    - url: https://www.emp.example.org/our-people/laila-osei
+      reason: The Executive Director profile is linked in the Board section beside that covered EMP office.
+    - url: https://www.emp.example.org/our-people/samira-voss
+      reason: Dr. Samira Voss's profile is linked from her EMP Board Chair card.
+    - url: https://www.emp.example.org/people-profile/pavel-neri
+      reason: Pavel Neri's profile is linked from his EMP Board Secretary card.
+    - url: https://www.emp.example.org/people-profile/amina-diallo
+      reason: Amina Diallo's profile is linked from her card in the EMP Board of Directors roster.
+    - url: https://www.emp.example.org/our-people/mateo-velin
+      reason: Mateo Velin's profile is linked from his card in the EMP Board of Directors roster.
+- name: profile_links_advisory_scope
+  inputs:
+    fixture: discovery_governance_profiles
+    url: https://www.emp.example.org/our-people/governance
+    people_sought: Members of the Scientific Advisory Committee
+    subject_label: Organization
+    subject: Equinox Medicines Partnership
+  expected_output:
+    selections:
+    - url: https://www.emp.example.org/our-people/elena-marin
+      reason: Dr. Elena Marin's profile is linked from her Scientific Advisory Committee Chair card.
+    - url: https://www.emp.example.org/our-people/ibrahim-kato
+      reason: Ibrahim Kato's profile is linked from his card in the Scientific Advisory Committee roster.
+    - url: https://www.emp.example.org/our-people/linh-tran
+      reason: Linh Tran's profile is linked from her card in the Scientific Advisory Committee roster.
+    - url: https://www.emp.example.org/our-people/sofia-mendes
+      reason: Sofía Mendes's profile is linked from her card in the Scientific Advisory Committee roster.
 - name: direct_directory_and_profiles
   inputs:
     fixture: discovery_leadership_links

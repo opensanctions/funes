@@ -63,16 +63,29 @@ as usable content, a terminal miss, or a repairable blocker.
 
 ## Discovery ground truth and evaluation contract
 
-- A positive link is one whose destination is likely to produce an extraction
-  `Hit` under the same brief: the destination itself is expected to evidence at
-  least one named human holding a brief-covered position for the subject.
+- A positive link is one whose destination is likely to be a direct holder
+  source under the same brief: its purpose, or a substantive section of it, is
+  expected to identify, enumerate, profile, appoint, elect, accredit, or
+  otherwise directly record at least one named human holding a brief-covered
+  position for the subject.
+- Producing an extraction `Hit` is necessary but not sufficient. Extraction may
+  accept an incidental person-position statement, while discovery excludes
+  destinations whose substantive purpose is something else. Speeches,
+  statements, op-eds, interviews, authored publications, judgments, event
+  appearances, and general news about a holder are negative unless the document
+  directly establishes an appointment, election, accreditation, succession, or
+  other holding.
 - Never label a link positive merely because it may lead onward to another useful
   page. Generic index, governance, organization, and structure pages are negative
-  unless the captured source indicates that the destination itself names covered
-  holders.
-- Candidate and nomination material is not holder evidence. Results,
-  appointments, rosters, and profiles qualify when their context indicates that
-  they name covered holders, including former or future holders.
+  unless the captured source indicates that the destination itself is a direct
+  holder source.
+- Candidate and nomination material does not establish a holding. Results,
+  appointments, accreditation notices, rosters, directories, named organization
+  charts, and profiles qualify when their context indicates that they directly
+  record covered holders, including former or future holders.
+- A useful adjudication test is whether a researcher would open the destination
+  to answer who holds or held the brief-covered position, rather than merely
+  expect the person's title to appear incidentally.
 - Base expectations on the evidence available in the captured source. The brief
   determines relevance but does not prove the destination's contents.
 - `Discovery` expectations require an exact, order-independent URL set with no
