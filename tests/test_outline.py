@@ -190,12 +190,14 @@ def test_links_anchor_text_normalized() -> None:
       <a href="/a">  Jane   Doe </a>
       <a href="/b"><img src="/x.png" alt="Ignored"></a>
       <a href="/c">   </a>
+      <a href="/d"><span>Jane</span><span>Doe</span></a>
     </body>
     """
     assert candidate_links(BASE, html) == [
         CandidateLink(url="https://example.org/a", anchor="Jane Doe"),
         CandidateLink(url="https://example.org/b", anchor=None),
         CandidateLink(url="https://example.org/c", anchor=None),
+        CandidateLink(url="https://example.org/d", anchor="Jane Doe"),
     ]
 
 

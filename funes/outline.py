@@ -70,7 +70,7 @@ def candidate_links(final_url: str, html: str) -> list[CandidateLink]:
 
 def _anchor_text(anchor: Tag) -> str | None:
     """Whitespace-collapsed anchor text, or ``None`` when blank."""
-    text = _normalize(anchor.get_text())
+    text = _normalize(anchor.get_text(" "))
     return text or None
 
 
