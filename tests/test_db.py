@@ -27,9 +27,10 @@ from funes.db import (
     import_catalogue,
     select_due_candidates,
     store_broken_attempt,
+    store_discovered_candidates,
     store_inspection,
 )
-from funes.extract import Hit, Miss
+from funes.extract import Hit, LinkSelection, Miss
 from funes.extract import Person as PersonResult
 from funes.extract import Position as PositionResult
 from funes.sources import DatasetDefinition, SubjectDefinition
@@ -638,3 +639,148 @@ async def run_with_session[T](runner: Callable[[AsyncSession], Awaitable[T]]) ->
             return await runner(session)
     finally:
         await engine.dispose()
+
+
+# --- store_discovered_candidates: discovery provenance against in-memory SQLite ---
+
+
+async def add_subject(session: AsyncSession, dataset: str, subject: str) -> UUID:
+    await import_catalogue(
+        session,
+        [make_definition(dataset, "Board members", "Organization", {subject: []})],
+    )
+    await session.flush()
+    stmt = select(Subject.id).where(Subject.name == subject)
+    return (await session.execute(stmt)).scalar_one()
+
+
+def make_links(*urls: str) -> list[LinkSelection]:
+    return [LinkSelection(url=url, reason=f"{url} looks promising") for url in urls]
+
+
+def test_store_discovered_candidates_records_provenance():
+    def run() -> tuple[int, list[tuple[str, UUID, str]]]:
+        async def scenario(
+            session: AsyncSession,
+        ) -> tuple[int, list[tuple[str, UUID, str]]]:
+            subject_id = await add_subject(session, "one", "Example Foundation")
+            attempt_id = uuid4()
+            inserted = await store_discovered_candidates(
+                session,
+                subject_id=subject_id,
+                attempt_id=attempt_id,
+                links=make_links("https://a.example", "https://b.example"),
+            )
+            await session.commit()
+            rows = (
+                await session.execute(
+                    select(Url.url, Candidate.attempt_id, Candidate.reason)
+                    .join(Candidate, Candidate.url_id == Url.id)
+                    .where(Candidate.subject_id == subject_id)
+                    .order_by(Url.url)
+                )
+            ).all()
+            return inserted, [(url, aid, reason) for url, aid, reason in rows]
+
+        return asyncio.run(run_with_session(scenario))
+
+    inserted, rows = run()
+    assert inserted == 2
+    assert [url for url, _, reason in rows] == [
+        "https://a.example",
+        "https://b.example",
+    ]
+    assert all(reason == f"{url} looks promising" for url, _, reason in rows)
+    assert len({attempt_id for _, attempt_id, _ in rows}) == 1
+
+
+def test_store_discovered_candidates_rediscovery_is_noop():
+    """Re-discovering the same links keeps the original provenance."""
+
+    first_attempt = uuid4()
+
+    def run() -> tuple[int, UUID, str]:
+        async def scenario(session: AsyncSession) -> tuple[int, UUID, str]:
+            subject_id = await add_subject(session, "one", "Example Foundation")
+            await store_discovered_candidates(
+                session,
+                subject_id=subject_id,
+                attempt_id=first_attempt,
+                links=make_links("https://a.example"),
+            )
+            await session.commit()
+            rediscovered = await store_discovered_candidates(
+                session,
+                subject_id=subject_id,
+                attempt_id=uuid4(),
+                links=make_links("https://a.example"),
+            )
+            await session.commit()
+            row = (
+                await session.execute(
+                    select(Candidate.attempt_id, Candidate.reason)
+                    .join(Url, Url.id == Candidate.url_id)
+                    .where(Candidate.subject_id == subject_id)
+                )
+            ).one()
+            return rediscovered, row[0], row[1]
+
+        return asyncio.run(run_with_session(scenario))
+
+    rediscovered, attempt_id, reason = run()
+    assert rediscovered == 0
+    assert attempt_id == first_attempt
+    assert reason == "https://a.example looks promising"
+
+
+def test_store_discovered_candidates_preserves_catalogue_candidate():
+    """A candidate seeded by the catalogue stays catalogue-sourced (null provenance)."""
+
+    def run() -> tuple[int, UUID | None, str | None]:
+        async def scenario(
+            session: AsyncSession,
+        ) -> tuple[int, UUID | None, str | None]:
+            candidate = await add_candidate(
+                session, "one", "Example Foundation", "https://a.example"
+            )
+            await session.commit()
+            inserted = await store_discovered_candidates(
+                session,
+                subject_id=candidate.subject_id,
+                attempt_id=uuid4(),
+                links=make_links("https://a.example"),
+            )
+            await session.commit()
+            row = (
+                await session.execute(
+                    select(Candidate.attempt_id, Candidate.reason).where(
+                        Candidate.id == candidate.id
+                    )
+                )
+            ).one()
+            return inserted, row[0], row[1]
+
+        return asyncio.run(run_with_session(scenario))
+
+    assert run() == (0, None, None)
+
+
+def test_store_discovered_candidates_empty_links_is_noop():
+    def run() -> tuple[int, int, int]:
+        async def scenario(session: AsyncSession) -> tuple[int, int, int]:
+            subject_id = await add_subject(session, "one", "Example Foundation")
+            inserted = await store_discovered_candidates(
+                session, subject_id=subject_id, attempt_id=uuid4(), links=[]
+            )
+            await session.commit()
+
+            async def count(table) -> int:
+                return (
+                    await session.execute(select(func.count()).select_from(table))
+                ).scalar_one()
+
+            return inserted, await count(Url), await count(Candidate)
+
+        return asyncio.run(run_with_session(scenario))
+
+    assert run() == (0, 0, 0)

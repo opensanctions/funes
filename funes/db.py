@@ -1,6 +1,7 @@
 """Normalized dataset/subject/url candidate and attempt persistence."""
 
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any, ClassVar
@@ -29,7 +30,7 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
-from funes.extract import Hit, Miss
+from funes.extract import Hit, LinkSelection, Miss
 from funes.sources import DatasetDefinition
 
 
@@ -134,6 +135,8 @@ class Candidate(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    attempt_id: Mapped[uuid.UUID | None] = mapped_column()
+    reason: Mapped[str | None] = mapped_column()
 
     subject: Mapped[Subject] = relationship(back_populates="candidates")
     url: Mapped[Url] = relationship(back_populates="candidates")
@@ -370,6 +373,54 @@ async def import_catalogue(
                 index_elements=[Candidate.subject_id, Candidate.url_id]
             )
         )
+
+
+async def store_discovered_candidates(
+    session: AsyncSession,
+    *,
+    subject_id: uuid.UUID,
+    attempt_id: uuid.UUID,
+    links: Sequence[LinkSelection],
+) -> int:
+    """Persist discovery-selected links as candidates for one subject.
+
+    Upserts the shared ``Url`` rows, then inserts subject/url candidates
+    carrying the discovery provenance: the id of the attempt whose
+    discovery run selected them and the selecting model's reason.
+    ON CONFLICT DO NOTHING keeps the first source: existing candidates —
+    catalogue or earlier discovery — are never updated. Returns the
+    number of newly inserted candidates.
+    """
+    if not links:
+        return 0
+    insert = _upsert_insert(session)
+    urls = list(dict.fromkeys(link.url for link in links))
+    await session.execute(
+        insert(Url)
+        .values([{Url.url: url} for url in urls])
+        .on_conflict_do_nothing(index_elements=[Url.url])
+    )
+    url_id_by_url = dict(
+        (await session.execute(select(Url.url, Url.id).where(Url.url.in_(urls)))).all()
+    )
+    stmt = (
+        insert(Candidate)
+        .values(
+            [
+                {
+                    Candidate.subject_id: subject_id,
+                    Candidate.url_id: url_id_by_url[link.url],
+                    Candidate.attempt_id: attempt_id,
+                    Candidate.reason: link.reason,
+                }
+                for link in links
+            ]
+        )
+        .on_conflict_do_nothing(index_elements=[Candidate.subject_id, Candidate.url_id])
+        .returning(Candidate.id)
+    )
+    result = await session.execute(stmt)
+    return len(result.all())
 
 
 async def select_due_candidates(
