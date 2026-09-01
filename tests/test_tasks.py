@@ -11,8 +11,13 @@ from funes.tasks import repair_snapshot
 
 def test_task_registration_names_and_queues() -> None:
     app.perform_import_paths()
-    assert {"funes.inspect_candidate", "funes.repair_snapshot"} <= set(app.tasks)
+    assert {
+        "funes.inspect_candidate",
+        "funes.discover_links",
+        "funes.repair_snapshot",
+    } <= set(app.tasks)
     assert app.tasks["funes.inspect_candidate"].queue == "inspect"
+    assert app.tasks["funes.discover_links"].queue == "discovery"
     assert app.tasks["funes.repair_snapshot"].queue == "repair"
 
 

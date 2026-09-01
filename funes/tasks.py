@@ -5,6 +5,7 @@ import uuid
 from enum import StrEnum
 from functools import partial
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import selectinload
 
@@ -21,7 +22,6 @@ from funes.extract import (
     BrokenSnapshot,
     ExtractionDependencies,
     Hit,
-    LinkSelection,
     Miss,
     build_discovery_prompt,
     build_prompt,
@@ -44,6 +44,7 @@ class Queue(StrEnum):
     """Procrastinate queues, named for the work they carry."""
 
     INSPECT = "inspect"
+    DISCOVERY = "discovery"
     REPAIR = "repair"
 
 
@@ -51,6 +52,7 @@ class Task(StrEnum):
     """Registered Procrastinate task names."""
 
     INSPECT_CANDIDATE = "funes.inspect_candidate"
+    DISCOVER_LINKS = "funes.discover_links"
     REPAIR_SNAPSHOT = "funes.repair_snapshot"
 
 
@@ -59,6 +61,109 @@ async def repair_snapshot(attempt_id: str) -> None:
     raise NotImplementedError(
         f"broken-snapshot repair is not implemented yet (attempt {attempt_id})"
     )
+
+
+@app.task(name=Task.DISCOVER_LINKS, queue=Queue.DISCOVERY)
+async def discover_links(attempt_id: str) -> None:
+    """Discover follow-up candidates from one completed usable attempt.
+
+    Runs in a fresh agent context on the dedicated discovery queue: it
+    reloads the attempt with its candidate, URL, subject, dataset brief,
+    and inspection, reconstructs the exact snapshot Pravda stored for
+    it, and lets the discovery agent pick links from the rendered page.
+    Broken attempts have no inspection and are never routed here.
+    """
+    model = config.model.name
+
+    engine = create_async_engine(config.pravda.database_url)
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+            attempt = (
+                await session.execute(
+                    select(db.Attempt)
+                    .where(db.Attempt.id == uuid.UUID(attempt_id))
+                    .options(
+                        selectinload(db.Attempt.inspection),
+                        selectinload(db.Attempt.candidate).selectinload(
+                            db.Candidate.url
+                        ),
+                        selectinload(db.Attempt.candidate)
+                        .selectinload(db.Candidate.subject)
+                        .selectinload(db.Subject.dataset),
+                    )
+                )
+            ).scalar_one_or_none()
+            if attempt is None:
+                raise LookupError(f"attempt {attempt_id} not found")
+            if attempt.inspection is None:
+                raise LookupError(f"attempt {attempt_id} has no Hit/Miss inspection")
+            candidate = attempt.candidate
+            url = candidate.url.url
+            brief = Brief(
+                people_sought=candidate.subject.dataset.people_sought,
+                subject_label=candidate.subject.dataset.subject_label,
+                subject=candidate.subject.name,
+            )
+            # End the read transaction before Pravda and LLM work;
+            # expire_on_commit=False keeps the loaded attributes alive.
+            await session.commit()
+
+            pravda = pravda_client(config.pravda)
+            async with pravda:
+                snapshots = await pravda.snapshots(url)
+            snapshot = next(
+                (
+                    snapshot
+                    for snapshot in snapshots
+                    if snapshot.id == attempt.snapshot_id
+                ),
+                None,
+            )
+            if snapshot is None:
+                raise LookupError(f"snapshot {attempt.snapshot_id} not found for {url}")
+
+            fs = artifact_filesystem(config.pravda)
+            html = (await read_artifact(fs, snapshot.rendered_html)).decode("utf-8")
+            links = candidate_links(snapshot.final_url, html)
+            if not links:
+                log.info("%s → no candidate links, skipping discovery", url)
+                return
+
+            log.info("%s → discovering …", url)
+            run = await discovery_agent.run(
+                build_discovery_prompt(links),
+                model=model,
+                run_id=attempt_id,
+                deps=brief,
+            )
+            write_session(
+                session_path(config.sessions.base_path, "discovery", attempt_id),
+                run.all_messages_json(),
+            )
+            enumerated = {link.url for link in links}
+            dropped = [
+                selection
+                for selection in run.output.selections
+                if selection.url not in enumerated
+            ]
+            if dropped:
+                log.warning("dropping %d out-of-set link selection(s)", len(dropped))
+            selections = [
+                selection
+                for selection in run.output.selections
+                if selection.url in enumerated
+            ]
+
+            inserted = await db.store_discovered_candidates(
+                session,
+                subject_id=candidate.subject_id,
+                attempt_id=attempt.id,
+                links=selections,
+            )
+            await session.commit()
+            log.info("%s → discovered %d new candidate(s)", url, inserted)
+    finally:
+        await engine.dispose()
 
 
 @app.task(name=Task.INSPECT_CANDIDATE, queue=Queue.INSPECT)
@@ -178,45 +283,9 @@ async def inspect_candidate(candidate_id: str) -> None:
                 case Miss() as miss:
                     log.info("%s → miss: %s", snapshot.final_url, miss.reason)
 
-            # Site traversal runs for both hits and misses: it depends only
-            # on the captured page, not the inspection outcome. Broken
-            # snapshots returned above never reach here.
-            links = candidate_links(snapshot.final_url, html)
-            selections: list[LinkSelection] = []
-            if not links:
-                log.info(
-                    "%s → no candidate links, skipping discovery", snapshot.final_url
-                )
-            else:
-                log.info("%s → discovering …", snapshot.final_url)
-                discovery_run = await discovery_agent.run(
-                    build_discovery_prompt(links),
-                    model=model,
-                    run_id=str(attempt_id),
-                    deps=deps.brief,
-                )
-                write_session(
-                    session_path(
-                        config.sessions.base_path, "discovery", str(attempt_id)
-                    ),
-                    discovery_run.all_messages_json(),
-                )
-                enumerated = {link.url for link in links}
-                dropped = [
-                    selection
-                    for selection in discovery_run.output.selections
-                    if selection.url not in enumerated
-                ]
-                if dropped:
-                    log.warning(
-                        "dropping %d out-of-set link selection(s)", len(dropped)
-                    )
-                selections = [
-                    selection
-                    for selection in discovery_run.output.selections
-                    if selection.url in enumerated
-                ]
-
+            # The inspection must be durable before discovery is
+            # deferred: discover_links reloads the attempt and its
+            # inspection from the database.
             db.store_inspection(
                 session,
                 attempt_id=attempt_id,
@@ -225,15 +294,7 @@ async def inspect_candidate(candidate_id: str) -> None:
                 result=run.output,
                 model=model,
             )
-            inserted = await db.store_discovered_candidates(
-                session,
-                subject_id=candidate.subject_id,
-                attempt_id=attempt_id,
-                links=selections,
-            )
             await session.commit()
-            log.info(
-                "%s → discovered %d new candidate(s)", snapshot.final_url, inserted
-            )
+            await discover_links.defer_async(attempt_id=str(attempt_id))
     finally:
         await engine.dispose()

@@ -15,6 +15,7 @@ docker compose up -d     # shared dev infrastructure: Postgres + headed Chrome
 uv run --env-file .env funes migrate      # apply Pravda and Funes schemas, bootstrap candidates from YAML
 uv run --env-file .env funes enqueue      # queue one job per due candidate
 uv run --env-file .env procrastinate worker --queues inspect  # consume the inspect queue only; repair jobs stay pending
+uv run --env-file .env procrastinate worker --queues discovery  # dedicated discovery worker: discover_links runs per usable attempt
 uv run --env-file .env procrastinate shell list_jobs    # inspect the queue
 uv run --env-file .env pytest             # run the test suite
 ```
@@ -28,7 +29,7 @@ uv run --env-file .env pytest             # run the test suite
 funes/
   procrastinate.py  # module-level Procrastinate app (the PROCRASTINATE_APP target); worker config
   cli.py        # migrate, enqueue commands
-  tasks.py      # Procrastinate tasks: inspect_candidate pipeline; dormant repair_snapshot
+  tasks.py      # Procrastinate tasks: inspect_candidate pipeline; discover_links on the discovery queue; dormant repair_snapshot
   capture.py    # Pravda client and fsspec artifact helpers
   extract.py    # pydantic-ai extraction and discovery agents, Hit/Miss/BrokenSnapshot and link-selection schemas, prompts
   outline.py    # compact model-facing outline from rendered HTML + HAR; candidate link enumeration
