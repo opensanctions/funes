@@ -110,6 +110,51 @@ def test_har_body_reference_matches_percent_encoded_request_url() -> None:
     ]
 
 
+def test_url_fragments_stripped_from_hrefs_and_srcs() -> None:
+    """Fragments never reach the server; resolved URLs drop them."""
+    html = """
+    <body>
+      <a href="/people/jane#top">Jane</a>
+      <img src="/img/group.webp#v2">
+    </body>
+    """
+    assert build_outline(BASE, html).splitlines() == [
+        '- a "Jane" [href=https://example.org/people/jane]',
+        "- img [src=https://example.org/img/group.webp]",
+    ]
+
+
+def test_har_body_matched_despite_cache_busting_src_fragment() -> None:
+    """A src fragment must not hide the stored body behind a missed key."""
+    har = {
+        "log": {
+            "entries": [
+                {
+                    "request": {"url": "https://example.org/img/jane.jpg"},
+                    "response": {"content": {"_file": "storage/example.org/jane.jpg"}},
+                }
+            ]
+        }
+    }
+    html = "<body><img src='/img/jane.jpg#v2'></body>"
+    assert build_outline(BASE, html, har).splitlines() == [
+        (
+            "- img [src=https://example.org/img/jane.jpg] "
+            "[body=storage/example.org/jane.jpg]"
+        )
+    ]
+
+
+def test_single_element_body_renders_that_element() -> None:
+    """A body that is one link or image folds into it, not into nothing."""
+    assert build_outline(BASE, '<body><a href="/x">Jane</a></body>').splitlines() == [
+        '- a "Jane" [href=https://example.org/x]'
+    ]
+    assert build_outline(
+        BASE, '<body><img src="/a.png" alt="staff"></body>'
+    ).splitlines() == ["- img [src=https://example.org/a.png] [alt=staff]"]
+
+
 def test_empty_subtrees_dropped_and_hidden_retained() -> None:
     """Content-free subtrees vanish; hidden content stays visible to the AI."""
     html = """

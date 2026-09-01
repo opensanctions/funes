@@ -1,8 +1,9 @@
 """Build compact, model-facing outlines from rendered HTML.
 
 The output preserves DOM order while removing empty elements and collapsing
-single-child wrappers. Links and images retain resolved resource URLs, and
-images may include paths to bodies stored in the snapshot's HAR.
+single-child wrappers. Links and images retain resolved resource URLs with
+fragments stripped, and images may include paths to bodies stored in the
+snapshot's HAR.
 
 Example::
 
@@ -14,7 +15,7 @@ Example::
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urldefrag, urljoin
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 
@@ -40,13 +41,19 @@ def build_outline(url: str, html: str, http_archive: dict | None = None) -> str:
     root = _build(soup.body if soup.body is not None else soup, url, bodies)
     lines: list[str] = []
     if root is not None:
-        if root.text is not None:
-            lines.append(f"- text: {_quote(root.text)}")
-        for child in root.children:
-            if isinstance(child, str):
-                lines.append(f"- text: {_quote(child)}")
-            else:
-                lines.extend(_render(child, 0))
+        if root.attrs:
+            # Wrapper collapsing can fold the root into a real element (a
+            # body that is nothing but one linked image); that element is
+            # the content, so render it like any other.
+            lines.extend(_render(root, 0))
+        else:
+            if root.text is not None:
+                lines.append(f"- text: {_quote(root.text)}")
+            for child in root.children:
+                if isinstance(child, str):
+                    lines.append(f"- text: {_quote(child)}")
+                else:
+                    lines.extend(_render(child, 0))
     return "\n".join(lines)
 
 
@@ -100,16 +107,18 @@ def _build(tag: Tag, url: str, bodies: dict[str, str]) -> _Node | None:
 
 
 def _kept_attrs(tag: Tag, url: str, bodies: dict[str, str]) -> list[tuple[str, str]]:
-    """The attributes worth showing: link targets and image sources."""
+    """The attributes worth showing: fragment-free link targets and sources."""
     attrs: list[tuple[str, str]] = []
     if tag.name == "a":
         href = tag.get("href")
         if isinstance(href, str):
-            attrs.append(("href", urljoin(url, href)))
+            target, _fragment = urldefrag(urljoin(url, href))
+            attrs.append(("href", target))
     elif tag.name == "img":
         src = tag.get("src")
         if isinstance(src, str):
-            resolved = quote(urljoin(url, src), safe="/:?#[]@!$&'()*+,;=%")
+            target, _fragment = urldefrag(urljoin(url, src))
+            resolved = quote(target, safe="/:?#[]@!$&'()*+,;=%")
             attrs.append(("src", resolved))
             if resolved in bodies:
                 attrs.append(("body", bodies[resolved]))

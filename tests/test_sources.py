@@ -92,6 +92,59 @@ subjects:
     ]
 
 
+def test_load_datasets_strips_url_fragments(tmp_path):
+    fs = fsspec.filesystem("memory")
+    base = f"memory://{tmp_path.name}/inputs"
+    write_yaml(
+        fs,
+        base,
+        "one.yaml",
+        """\
+people_sought: Heads
+subject_label: Organization
+subjects:
+  - name: Org A
+    urls:
+      - https://a.example/board#members
+      - https://a.example/about
+""",
+    )
+
+    assert load_datasets(base) == [
+        DatasetDefinition(
+            name="one",
+            people_sought="Heads",
+            subject_label="Organization",
+            subjects=[
+                SubjectDefinition(
+                    name="Org A",
+                    urls=["https://a.example/board", "https://a.example/about"],
+                )
+            ],
+        )
+    ]
+
+
+def test_load_datasets_rejects_bare_fragment_urls(tmp_path):
+    fs = fsspec.filesystem("memory")
+    base = f"memory://{tmp_path.name}/inputs"
+    write_yaml(
+        fs,
+        base,
+        "one.yaml",
+        """\
+people_sought: Heads
+subject_label: Organization
+subjects:
+  - name: Org A
+    urls: ["#members"]
+""",
+    )
+
+    with pytest.raises(ValidationError, match="bare fragment"):
+        load_datasets(base)
+
+
 def test_load_datasets_rejects_duplicate_subjects(tmp_path):
     fs = fsspec.filesystem("memory")
     base = f"memory://{tmp_path.name}/inputs"

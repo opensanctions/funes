@@ -2,6 +2,7 @@
 
 import os
 from typing import Annotated
+from urllib.parse import urldefrag
 
 import fsspec
 import yaml
@@ -22,6 +23,15 @@ class SubjectDefinition(BaseModel):
 
     name: _Label
     urls: list[_Label] = Field(default_factory=list)
+
+    @field_validator("urls")
+    @classmethod
+    def strip_url_fragments(cls, urls: list[str]) -> list[str]:
+        """Catalogue URLs are fragment-free: fragments never reach the server."""
+        stripped = [urldefrag(url)[0] for url in urls]
+        if any(not url for url in stripped):
+            raise ValueError("catalogue urls must not be bare fragments")
+        return stripped
 
 
 class DatasetDefinition(BaseModel):

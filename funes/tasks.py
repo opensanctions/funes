@@ -18,11 +18,7 @@ from funes.capture import (
     pravda_client,
     read_artifact,
 )
-from funes.discovery import (
-    build_discovery_prompt,
-    candidate_links,
-    discovery_agent,
-)
+from funes.discovery import discovery_agent, page_link_urls
 from funes.extract import (
     BrokenSnapshot,
     ExtractionDependencies,
@@ -72,7 +68,8 @@ async def discover_links(attempt_id: str) -> None:
     Runs in a fresh agent context on the dedicated discovery queue: it
     reloads the attempt with its candidate, URL, subject, dataset brief,
     and inspection, reconstructs the exact snapshot Pravda stored for
-    it, and lets the discovery agent pick links from the rendered page.
+    it, and lets the discovery agent select follow-up links from the same
+    page snapshot prompt the extraction agent judged.
     Broken attempts have no inspection and are never routed here.
     """
     model = config.model.name
@@ -131,14 +128,22 @@ async def discover_links(attempt_id: str) -> None:
 
             fs = artifact_filesystem(config.pravda)
             html = (await read_artifact(fs, snapshot.rendered_html)).decode("utf-8")
-            links = candidate_links(snapshot.final_url, html)
-            if not links:
-                log.info("%s → no candidate links, skipping discovery", url)
+            urls = page_link_urls(snapshot.final_url, html)
+            if not urls:
+                log.info("%s → no page links, skipping discovery", url)
                 return
 
+            metadata = metadata_from_html(
+                url,
+                html,
+                final_url=snapshot.final_url,
+                http_status=snapshot.http_status,
+                capture_error=first_error_line(snapshot.error),
+            )
+            outline = build_outline(snapshot.final_url, html, snapshot.http_archive)
             log.info("%s → discovering …", url)
             run = await discovery_agent.run(
-                build_discovery_prompt(links),
+                build_prompt(metadata, outline),
                 model=model,
                 run_id=attempt_id,
                 deps=brief,
@@ -147,11 +152,10 @@ async def discover_links(attempt_id: str) -> None:
                 session_path(config.sessions.base_path, "discovery", attempt_id),
                 run.all_messages_json(),
             )
-            enumerated = {link.url for link in links}
             dropped = [
                 selection
                 for selection in run.output.selections
-                if selection.url not in enumerated
+                if selection.url not in urls
             ]
             if dropped:
                 log.warning(
@@ -160,7 +164,7 @@ async def discover_links(attempt_id: str) -> None:
             selections = [
                 selection
                 for selection in run.output.selections
-                if selection.url in enumerated
+                if selection.url in urls
             ]
 
             inserted = await db.store_discovered_candidates(

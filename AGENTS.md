@@ -32,7 +32,7 @@ funes/
   tasks.py      # Procrastinate tasks: inspect_candidate pipeline; discover_links on the discovery queue; dormant repair_snapshot
   capture.py    # Pravda client and fsspec artifact helpers
   extract.py    # pydantic-ai extraction agent, Hit/Miss/BrokenSnapshot schemas, prompts
-  discovery.py  # candidate link enumeration; pydantic-ai discovery agent and link-selection schema
+  discovery.py  # page link-target enumeration; pydantic-ai discovery agent selecting from the page outline
   agents.py     # vocabulary shared by the LLM agents: trusted brief, strict output-schema bases
   outline.py    # compact model-facing outline from rendered HTML + HAR
   db.py         # SQLAlchemy models: Dataset/Subject/URL/Candidate/Attempt persistence
