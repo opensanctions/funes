@@ -1,8 +1,15 @@
 """Tests for the on-demand DOM outline builder."""
 
+import logging
+
 import pytest
 
-from funes.outline import build_outline, har_resource_media_types
+from funes.outline import (
+    CandidateLink,
+    build_outline,
+    candidate_links,
+    har_resource_media_types,
+)
 
 BASE = "https://example.org/about/"
 
@@ -151,6 +158,79 @@ def test_singular_wrappers_collapse() -> None:
 def test_non_http_base_url_fails_loud() -> None:
     with pytest.raises(ValueError):
         build_outline("about/page.html", "<body><p>x</p></body>")
+
+
+def test_links_resolved_and_deduplicated_in_dom_order() -> None:
+    html = """
+    <body>
+      <a href="/people/jane">Jane</a>
+      <a href="bio.html">Bio</a>
+      <a href="https://other.example.net/x">Elsewhere</a>
+      <a href="/people/jane#top">Jane again</a>
+      <a href="mailto:a@b.example">Mail</a>
+    </body>
+    """
+    assert candidate_links(BASE, html) == [
+        CandidateLink(url="https://example.org/people/jane", anchor="Jane"),
+        CandidateLink(url="https://example.org/about/bio.html", anchor="Bio"),
+        CandidateLink(url="https://other.example.net/x", anchor="Elsewhere"),
+    ]
+
+
+def test_links_fragments_stripped_queries_preserved() -> None:
+    html = '<body><a href="/search?q=jane&amp;page=2#results">Search</a></body>'
+    assert candidate_links(BASE, html) == [
+        CandidateLink(url="https://example.org/search?q=jane&page=2", anchor="Search")
+    ]
+
+
+def test_links_anchor_text_normalized() -> None:
+    html = """
+    <body>
+      <a href="/a">  Jane   Doe </a>
+      <a href="/b"><img src="/x.png" alt="Ignored"></a>
+      <a href="/c">   </a>
+      <a href="/d"><span>Jane</span><span>Doe</span></a>
+    </body>
+    """
+    assert candidate_links(BASE, html) == [
+        CandidateLink(url="https://example.org/a", anchor="Jane Doe"),
+        CandidateLink(url="https://example.org/b", anchor=None),
+        CandidateLink(url="https://example.org/c", anchor=None),
+        CandidateLink(url="https://example.org/d", anchor="Jane Doe"),
+    ]
+
+
+def test_links_non_http_schemes_rejected() -> None:
+    html = """
+    <body>
+      <a href="javascript:void(0)">JS</a>
+      <a href="ftp://files.example.org/f">FTP</a>
+      <a href="tel:+1234">Call</a>
+      <a href="/kept">Kept</a>
+    </body>
+    """
+    assert candidate_links(BASE, html) == [
+        CandidateLink(url="https://example.org/kept", anchor="Kept")
+    ]
+
+
+def test_links_capped_at_200_with_warning(caplog: pytest.LogCaptureFixture) -> None:
+    html = (
+        "<body>"
+        + "".join(f'<a href="/link/{i}">Link {i}</a>' for i in range(250))
+        + "</body>"
+    )
+    with caplog.at_level(logging.WARNING, logger="funes.outline"):
+        links = candidate_links(BASE, html)
+    assert len(links) == 200
+    assert links[0] == CandidateLink(url="https://example.org/link/0", anchor="Link 0")
+    assert any("capped" in record.message for record in caplog.records)
+
+
+def test_links_non_http_final_url_fails_loud() -> None:
+    with pytest.raises(ValueError):
+        candidate_links("page.html", "<body><a href='/x'>x</a></body>")
 
 
 def har_entry(url: str, file: str | None, mime_type: str | None) -> dict:
