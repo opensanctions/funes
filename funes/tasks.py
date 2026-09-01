@@ -121,6 +121,11 @@ async def discover_links(attempt_id: str) -> None:
             )
             if snapshot is None:
                 raise LookupError(f"snapshot {attempt.snapshot_id} not found for {url}")
+            issue = inspectability_issue(snapshot)
+            if issue is not None:
+                raise ValueError(
+                    f"usable attempt {attempt_id} has uninspectable snapshot: {issue}"
+                )
 
             fs = artifact_filesystem(config.pravda)
             html = (await read_artifact(fs, snapshot.rendered_html)).decode("utf-8")
@@ -147,7 +152,9 @@ async def discover_links(attempt_id: str) -> None:
                 if selection.url not in enumerated
             ]
             if dropped:
-                log.warning("dropping %d out-of-set link selection(s)", len(dropped))
+                log.warning(
+                    "%s → dropping %d out-of-set link selection(s)", url, len(dropped)
+                )
             selections = [
                 selection
                 for selection in run.output.selections
