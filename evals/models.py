@@ -1,4 +1,4 @@
-"""Case input types for the inspection eval suite."""
+"""Case input types shared by the captured-page eval suites."""
 
 from typing import Annotated
 
@@ -8,12 +8,11 @@ _NonBlank = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1
 
 
 class FixtureInput(BaseModel):
-    """One frozen capture and the inspection brief judged against it.
+    """One frozen capture and the runtime brief judged against it.
 
     ``people_sought`` names the class of position holders; ``subject``
     scopes the search; ``subject_label`` names the subject's role in this
-    dataset. Together they render the runtime brief exactly as the worker
-    builds it.
+    dataset. Together they render the brief exactly as the workers build it.
     """
 
     model_config = ConfigDict(extra="forbid")

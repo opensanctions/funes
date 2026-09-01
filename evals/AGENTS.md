@@ -1,14 +1,13 @@
-# Extraction eval guidance
+# Evaluation guidance
 
-These evals define the ground truth used to judge the extraction pipeline. They
-must remain an independent check on the runtime prompt: do not treat the current
-wording in `funes/extract.py` as proof that an expectation is correct, and do not
+These evals define the ground truth used to judge the extraction and discovery
+pipelines. They must remain an independent check on the runtime prompts: do not
+treat current prompt wording as proof that an expectation is correct, and do not
 change an expectation merely to make the current model pass.
 
 Keep this file focused on fixture-authoring and evaluation decisions. Do not copy
-the extraction prompt here. When prompt and fixture disagree, review the captured
-source, the inspection brief, and the intended product semantics before changing
-either one.
+runtime prompts here. When a prompt and fixture disagree, review the captured
+source, runtime brief, and intended product semantics before changing either one.
 
 ## Fixture ground truth
 
@@ -49,7 +48,7 @@ explicit runtime rule. Ambiguous access denials lean broken so a future repair
 workflow can retry them. A redirect is not itself an outcome: judge its destination
 as usable content, a terminal miss, or a repairable blocker.
 
-## Evaluation contract
+## Extraction evaluation contract
 
 - `Hit` expectations require an exact, order-independent person-position graph.
   Names, dates of birth, countries, position names, organizations, jurisdictions,
@@ -61,6 +60,26 @@ as usable content, a terminal miss, or a repairable blocker.
   variable to compare reliably.
 - F1 and per-field accuracy scores are diagnostics. They help explain a failed
   exact hit assertion; they are not substitutes for it.
+
+## Discovery ground truth and evaluation contract
+
+- A positive link is one whose destination is likely to produce an extraction
+  `Hit` under the same brief: the destination itself is expected to evidence at
+  least one named human holding a brief-covered position for the subject.
+- Never label a link positive merely because it may lead onward to another useful
+  page. Generic index, governance, organization, and structure pages are negative
+  unless the captured source indicates that the destination itself names covered
+  holders.
+- Candidate and nomination material is not holder evidence. Results,
+  appointments, rosters, and profiles qualify when their context indicates that
+  they name covered holders, including former or future holders.
+- Base expectations on the evidence available in the captured source. The brief
+  determines relevance but does not prove the destination's contents.
+- `Discovery` expectations require an exact, order-independent URL set with no
+  duplicates. Selection reasons document the expected link but are informational
+  and are not compared.
+- Link precision, recall, and F1 are diagnostics for prompt iteration. The exact
+  URL-set assertion determines whether a case passes.
 
 ## Maintaining fixtures
 

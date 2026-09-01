@@ -1,0 +1,50 @@
+name: discovery
+cases:
+- name: direct_directory_and_profiles
+  inputs:
+    fixture: discovery_leadership_links
+    url: https://www.northstar.example.org/resources/leadership
+    people_sought: Board members and senior officers
+    subject_label: Organization
+    subject: Northstar Forum
+  expected_output:
+    selections:
+    - url: https://www.northstar.example.org/leadership/board
+      reason: The Board directory is described as containing profiles of the Chair, Secretary, members, and alternates.
+    - url: https://www.northstar.example.org/people/amara-vale
+      reason: Amara Vale's profile is linked beside her covered position as President of the Northstar Forum.
+    - url: https://www.northstar.example.org/people/tomas-ilyan
+      reason: Tomas Ilyan's profile is linked beside his covered position as Secretary-General of the Northstar Forum.
+- name: no_stepping_stones
+  inputs:
+    fixture: discovery_leadership_links
+    url: https://www.northstar.example.org/resources/leadership
+    people_sought: Department heads
+    subject_label: Organization
+    subject: Northstar Forum
+  expected_output:
+    selections: []
+- name: wrong_subject
+  inputs:
+    fixture: discovery_leadership_links
+    url: https://www.northstar.example.org/resources/leadership
+    people_sought: Board members and senior officers
+    subject_label: Organization
+    subject: Southwind Council
+  expected_output:
+    selections: []
+- name: holders_not_candidates
+  inputs:
+    fixture: discovery_election_documents
+    url: https://www.lydian-assembly.example.org/elections/council
+    people_sought: Members and officers of the Executive Council
+    subject_label: Organization
+    subject: Lydian Assembly
+  expected_output:
+    selections:
+    - url: https://www.lydian-assembly.example.org/documents/results.pdf
+      reason: The results document is described as naming the elected President, Vice-President, and Council members.
+    - url: https://www.lydian-assembly.example.org/council/2023-2026
+      reason: The outgoing Council directory is described as containing profiles of every member and officer from that term.
+evaluators:
+- DiscoveryLinkSet

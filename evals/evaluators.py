@@ -1,4 +1,4 @@
-"""Custom evaluators for the inspection eval suite.
+"""Custom evaluators for the captured-page eval suites.
 
 Classes referenced from dataset YAML must also be listed in
 CUSTOM_EVALUATOR_TYPES and passed to ``Dataset.from_file``.
@@ -11,6 +11,7 @@ from typing import Any
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext
 
 from evals.models import FixtureInput
+from funes.discovery import Discovery
 from funes.extract import BrokenSnapshot, Hit, Miss, PageResult, Person, Position
 
 
@@ -219,4 +220,41 @@ class InspectionF1(Evaluator[FixtureInput, PageResult]):
         }
 
 
-CUSTOM_EVALUATOR_TYPES = [InspectionF1]
+@dataclass
+class DiscoveryLinkSet(Evaluator[FixtureInput, Discovery]):
+    """Score the selected URLs; selection reasons are informational.
+
+    The exact assertion is order-independent and rejects duplicates. Precision,
+    recall, and F1 are diagnostics for prompt iteration.
+    """
+
+    def evaluate(
+        self, ctx: EvaluatorContext[FixtureInput, Discovery]
+    ) -> dict[str, EvaluationReason | float]:
+        expected_urls = [selection.url for selection in ctx.expected_output.selections]
+        actual_urls = [selection.url for selection in ctx.output.selections]
+        expected_counts = Counter(expected_urls)
+        actual_counts = Counter(actual_urls)
+        expected_set = set(expected_urls)
+        actual_set = set(actual_urls)
+        matched = len(expected_set & actual_set)
+        precision = (
+            matched / len(actual_set)
+            if actual_set
+            else (1.0 if not expected_set else 0.0)
+        )
+        recall = matched / len(expected_set) if expected_set else 1.0
+        missing = list((expected_counts - actual_counts).elements())
+        extra = list((actual_counts - expected_counts).elements())
+        return {
+            "links_match": EvaluationReason(
+                expected_counts == actual_counts,
+                reason=f"missing={missing!r} extra={extra!r}",
+            ),
+            "link_precision": precision,
+            "link_recall": recall,
+            "link_f1": _f1(expected_set, actual_set),
+        }
+
+
+CUSTOM_EVALUATOR_TYPES = [InspectionF1, DiscoveryLinkSet]
