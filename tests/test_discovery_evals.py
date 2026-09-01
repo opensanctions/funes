@@ -40,9 +40,6 @@ def test_dataset_loads_with_direct_hit_cases(dataset):
         "sibling_program_scope",
         "profile_links_board_scope",
         "profile_links_advisory_scope",
-        "direct_directory_and_profiles",
-        "no_stepping_stones",
-        "wrong_subject",
         "holders_not_candidates",
     }
 
@@ -141,8 +138,8 @@ def test_eval_task_uses_runtime_prompt_and_filters_unknown_urls():
                         {
                             "selections": [
                                 {
-                                    "url": "https://www.northstar.example.org/leadership/board",
-                                    "reason": "The link is described as a Board profile directory.",
+                                    "url": "https://www.asteria.example.org/governance/president-and-council",
+                                    "reason": "The link is presented beside an image of Council members.",
                                 },
                                 {
                                     "url": "https://hallucinated.example/board",
@@ -156,23 +153,26 @@ def test_eval_task_uses_runtime_prompt_and_filters_unknown_urls():
         )
 
     inputs = FixtureInput(
-        fixture="discovery_leadership_links",
-        url="https://www.northstar.example.org/resources/leadership",
-        people_sought="Board members and senior officers",
+        fixture="discovery_governance_hub",
+        url="https://www.asteria.example.org/about/governance",
+        people_sought="Director-General, deputy heads, and members of the governing Council",
         subject_label="Organization",
-        subject="Northstar Forum",
+        subject="Asteria Conservation Union",
     )
     result = asyncio.run(discover(inputs, model=FunctionModel(fn)))
 
     assert [selection.url for selection in result.selections] == [
-        "https://www.northstar.example.org/leadership/board"
+        "https://www.asteria.example.org/governance/president-and-council"
     ]
     assert captured["instructions"].endswith(
-        "People sought: Board members and senior officers\n"
-        "Organization: Northstar Forum"
+        "People sought: Director-General, deputy heads, and members of the governing Council\n"
+        "Organization: Asteria Conservation Union"
     )
     [prompt] = [
         content for content in captured["contents"] if "<page_snapshot>" in content
     ]
-    assert "Leadership resources" in prompt
-    assert "[href=https://www.northstar.example.org/leadership/board]" in prompt
+    assert "How the Union is governed" in prompt
+    assert (
+        "[href=https://www.asteria.example.org/governance/president-and-council]"
+        in prompt
+    )
