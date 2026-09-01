@@ -21,12 +21,19 @@ from funes.extract import (
     BrokenSnapshot,
     ExtractionDependencies,
     Hit,
+    LinkSelection,
     Miss,
+    build_discovery_prompt,
     build_prompt,
+    discovery_agent,
     extraction_agent,
     metadata_from_html,
 )
-from funes.outline import build_outline, har_resource_media_types
+from funes.outline import (
+    build_outline,
+    candidate_links,
+    har_resource_media_types,
+)
 from funes.procrastinate import app, config
 from funes.sessions import session_path, write_session
 
@@ -170,6 +177,46 @@ async def inspect_candidate(candidate_id: str) -> None:
                     )
                 case Miss() as miss:
                     log.info("%s → miss: %s", snapshot.final_url, miss.reason)
+
+            # Site traversal runs for both hits and misses: it depends only
+            # on the captured page, not the inspection outcome. Broken
+            # snapshots returned above never reach here.
+            links = candidate_links(snapshot.final_url, html)
+            selections: list[LinkSelection] = []
+            if not links:
+                log.info(
+                    "%s → no candidate links, skipping discovery", snapshot.final_url
+                )
+            else:
+                log.info("%s → discovering …", snapshot.final_url)
+                discovery_run = await discovery_agent.run(
+                    build_discovery_prompt(links),
+                    model=model,
+                    run_id=str(attempt_id),
+                    deps=deps.brief,
+                )
+                write_session(
+                    session_path(
+                        config.sessions.base_path, "discovery", str(attempt_id)
+                    ),
+                    discovery_run.all_messages_json(),
+                )
+                enumerated = {link.url for link in links}
+                dropped = [
+                    selection
+                    for selection in discovery_run.output.selections
+                    if selection.url not in enumerated
+                ]
+                if dropped:
+                    log.warning(
+                        "dropping %d out-of-set link selection(s)", len(dropped)
+                    )
+                selections = [
+                    selection
+                    for selection in discovery_run.output.selections
+                    if selection.url in enumerated
+                ]
+
             db.store_inspection(
                 session,
                 attempt_id=attempt_id,
@@ -178,6 +225,15 @@ async def inspect_candidate(candidate_id: str) -> None:
                 result=run.output,
                 model=model,
             )
+            inserted = await db.store_discovered_candidates(
+                session,
+                subject_id=candidate.subject_id,
+                attempt_id=attempt_id,
+                links=selections,
+            )
             await session.commit()
+            log.info(
+                "%s → discovered %d new candidate(s)", snapshot.final_url, inserted
+            )
     finally:
         await engine.dispose()
