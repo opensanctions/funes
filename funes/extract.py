@@ -1,5 +1,6 @@
 """LLM extraction schema, prompts, and the Pydantic AI extraction agent."""
 
+import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
@@ -8,6 +9,8 @@ from typing import Annotated, Literal
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from pydantic_ai import Agent, BinaryContent, ModelRetry, NativeOutput, RunContext
+
+from funes.outline import CandidateLink
 
 log = logging.getLogger("funes")
 
@@ -191,6 +194,31 @@ Output: {"kind":"miss","reason":"The page is an account-required login wall."}
 """
 
 
+_DISCOVERY_INSTRUCTIONS = """\
+# Identity
+
+You select follow-up links from one captured web page against a trusted
+runtime brief: the people sought name the class of position holders, and the
+labeled subject scopes the search to one organization, country, court, or
+other entity. Every selected link becomes an inspection job of its own.
+
+# Selection policy
+
+- Select only from the enumerated candidate links, copying each URL exactly
+  as written. Never construct, modify, or guess a URL.
+- Select links likely to lead to pages naming people covered by the brief:
+  rosters and membership lists, individual biographies and profiles, team
+  and leadership pages, former-officeholder pages, and organization charts.
+- Skip navigation, footer, login, print, social-media, and
+  language-switcher links, and links clearly unrelated to the subject.
+- Be inclusive of plausible links: when a link could plausibly lead to
+  brief-covered people, select it rather than skip it, because unselected
+  links are never inspected.
+- Give a one-sentence reason for each selection naming what the link
+  appears to lead to.
+"""
+
+
 class _StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -325,13 +353,49 @@ class BrokenSnapshot(_StrictModel):
 PageResult = Annotated[Hit | Miss | BrokenSnapshot, Field(discriminator="kind")]
 
 
+class LinkSelection(_StrictModel):
+    """One candidate URL chosen for a follow-up inspection job."""
+
+    url: _NonBlank = Field(
+        description="Candidate URL copied exactly as enumerated.",
+    )
+    reason: _NonBlank = Field(
+        description=(
+            "One sentence naming what this link appears to lead to and why it "
+            "may name brief-covered people."
+        ),
+    )
+
+
+class Discovery(_StrictModel):
+    """The links selected from one page's candidate links."""
+
+    selections: list[LinkSelection] = Field(
+        description="Every candidate link worth inspecting, with its reason.",
+    )
+
+
 @dataclass(frozen=True)
-class ExtractionDependencies:
-    """Trusted brief and captured-resource access for one extraction run."""
+class Brief:
+    """Trusted per-dataset selection brief, shared by all agents."""
 
     people_sought: str
     subject_label: str
     subject: str
+
+
+def render_brief(brief: Brief) -> str:
+    """Render the trusted brief as dynamic instructions for any agent."""
+    return (
+        f"People sought: {brief.people_sought}\n{brief.subject_label}: {brief.subject}"
+    )
+
+
+@dataclass(frozen=True)
+class ExtractionDependencies:
+    """Trusted brief and captured-resource access for one extraction run."""
+
+    brief: Brief
     read_resource: Callable[[str], Awaitable[bytes]]
     resource_media_types: Mapping[str, str]
 
@@ -380,8 +444,43 @@ extraction_agent: Agent[ExtractionDependencies, PageResult] = Agent(
 @extraction_agent.instructions
 def _inspection_brief(ctx: RunContext[ExtractionDependencies]) -> str:
     """Render the run's trusted selection brief as dynamic instructions."""
-    deps = ctx.deps
-    return f"People sought: {deps.people_sought}\n{deps.subject_label}: {deps.subject}"
+    return render_brief(ctx.deps.brief)
+
+
+# The discovery agent picks follow-up links from a captured page against the
+# same brief. It runs in a fresh context with no tools: the prompt carries
+# only the enumerated candidate links.
+discovery_agent: Agent[Brief, Discovery] = Agent(
+    name="discovery",
+    output_type=NativeOutput(Discovery, strict=True),
+    instructions=_DISCOVERY_INSTRUCTIONS,
+    model_settings={"thinking": "low"},
+    deps_type=Brief,
+)
+
+
+@discovery_agent.instructions
+def _discovery_brief(ctx: RunContext[Brief]) -> str:
+    """Render the run's trusted selection brief as dynamic instructions."""
+    return render_brief(ctx.deps)
+
+
+def build_discovery_prompt(links: list[CandidateLink]) -> str:
+    """Build one user message enumerating the page's candidate links.
+
+    The prompt carries the untrusted link list only; the trusted brief
+    travels separately as run instructions.
+    """
+    entries = "".join(
+        f"{index}. URL: {link.url}\n   Anchor text: {_quote_anchor(link.text)}\n"
+        for index, link in enumerate(links, start=1)
+    )
+    return f"<candidate_links>\n{entries}</candidate_links>"
+
+
+def _quote_anchor(text: str) -> str:
+    """Quote anchor text as a JSON string, keeping non-ASCII readable."""
+    return json.dumps(text, ensure_ascii=False)
 
 
 def build_prompt(metadata: PageMetadata, outline: str) -> str:

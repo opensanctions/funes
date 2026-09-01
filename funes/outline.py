@@ -47,6 +47,14 @@ def build_outline(url: str, html: str, http_archive: dict | None = None) -> str:
 
 
 @dataclass
+class CandidateLink:
+    """One candidate follow-up link: its absolute URL and anchor text."""
+
+    url: str
+    text: str
+
+
+@dataclass
 class _Node:
     """One rendered element: its tag, folded leading text, kept attributes."""
 
