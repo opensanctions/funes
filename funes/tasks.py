@@ -17,6 +17,7 @@ from funes.capture import (
     read_artifact,
 )
 from funes.extract import (
+    Brief,
     BrokenSnapshot,
     ExtractionDependencies,
     Hit,
@@ -123,9 +124,11 @@ async def inspect_candidate(candidate_id: str) -> None:
             )
             outline = build_outline(snapshot.final_url, html, snapshot.http_archive)
             deps = ExtractionDependencies(
-                people_sought=people_sought,
-                subject_label=subject_label,
-                subject=subject,
+                brief=Brief(
+                    people_sought=people_sought,
+                    subject_label=subject_label,
+                    subject=subject,
+                ),
                 read_resource=partial(read_artifact, fs),
                 resource_media_types=har_resource_media_types(snapshot.http_archive),
             )

@@ -7,6 +7,7 @@ from pydantic_ai.models import Model
 
 from evals.models import FixtureInput
 from funes.extract import (
+    Brief,
     ExtractionDependencies,
     PageResult,
     build_prompt,
@@ -45,9 +46,11 @@ async def extract(inputs: FixtureInput, model: Model | str) -> PageResult:
         return resource_path.read_bytes()
 
     deps = ExtractionDependencies(
-        people_sought=inputs.people_sought,
-        subject_label=inputs.subject_label,
-        subject=inputs.subject,
+        brief=Brief(
+            people_sought=inputs.people_sought,
+            subject_label=inputs.subject_label,
+            subject=inputs.subject,
+        ),
         read_resource=read_resource,
         resource_media_types=har_resource_media_types(har),
     )
