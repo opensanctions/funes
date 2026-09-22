@@ -24,6 +24,3 @@ HealthRetries=5
 [Service]
 # The first start must pull the image, which can exceed systemd's 90s default.
 TimeoutStartSec=300
-
-[Install]
-WantedBy=default.target
