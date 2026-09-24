@@ -76,7 +76,8 @@ async def discover_links(attempt_id: str) -> None:
 
     engine = create_async_engine(config.pravda.database_url)
     try:
-        async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+        sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
+        async with sessionmaker() as session:
             attempt = (
                 await session.execute(
                     select(db.Attempt)
@@ -103,13 +104,12 @@ async def discover_links(attempt_id: str) -> None:
                 subject_label=candidate.subject.dataset.subject_label,
                 subject=candidate.subject.name,
             )
-            # End the read transaction before Pravda and LLM work;
+            # End the read transaction before browser and LLM work;
             # expire_on_commit=False keeps the loaded attributes alive.
             await session.commit()
 
-            pravda = pravda_client(config.pravda)
-            async with pravda:
-                snapshots = await pravda.snapshots(url)
+            pravda = pravda_client(config.pravda, sessionmaker)
+            snapshots = await pravda.snapshots(url)
             snapshot = next(
                 (
                     snapshot
@@ -200,7 +200,8 @@ async def inspect_candidate(candidate_id: str) -> None:
 
     engine = create_async_engine(config.pravda.database_url)
     try:
-        async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+        sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
+        async with sessionmaker() as session:
             candidate = await session.get(
                 db.Candidate,
                 uuid.UUID(candidate_id),
@@ -220,9 +221,8 @@ async def inspect_candidate(candidate_id: str) -> None:
             await session.commit()
 
             fs = artifact_filesystem(config.pravda)
-            pravda = pravda_client(config.pravda)
-            async with pravda:
-                snapshot = await pravda.snapshot(url)
+            pravda = pravda_client(config.pravda, sessionmaker)
+            snapshot = await pravda.snapshot(url)
 
             issue = inspectability_issue(snapshot)
             if issue is not None:

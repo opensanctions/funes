@@ -1,36 +1,12 @@
 # Funes-owned infrastructure for Pravda's in-process async client.
-#
-# Pravda connects from Funes's process to three things Funes owns and
-# runs here: a remote headed Chrome (Playwright run-server), Pravda's Postgres
-# database, and the artifact store (a local path on disk by default,
-# configured via PRAVDA_STORAGE_BASE_PATH).
-#
-#   docker compose up -d
+# The browser is external: PRAVDA_BROWSER_WS_URL points at any Playwright
+# Chromium WebSocket endpoint, which is not a container here.
 #
 # With the defaults below, set in .env:
-#   PRAVDA_DATABASE_URL=postgresql+psycopg://pravda:pravda@localhost:5432/pravda
-#   PRAVDA_BROWSER_WS_URL=ws://localhost:3000
+#   DATABASE_URL=postgresql+psycopg://pravda:pravda@localhost:5432/pravda
+#   PRAVDA_BROWSER_WS_URL=ws://127.0.0.1:9222
 #   PRAVDA_STORAGE_BASE_PATH=./storage
 services:
-  browser:
-    # Headed Chrome under xvfb, exposed as a remote Playwright WebSocket
-    # server on port 3000. Published from the Pravda repository as
-    # ghcr.io/opensanctions/pravda-browser. Pinned to the opensanctions-pravda
-    # version in pyproject.toml (>=0.1.5) so the bundled Playwright server
-    # version matches the client pinned transitively through that package.
-    image: ghcr.io/opensanctions/pravda-browser:0.1.5
-    init: true
-    ports:
-      - "127.0.0.1:3000:3000"
-    # Playwright's server exposes an HTTP /json listing of its browser
-    # endpoints; it answers only once the WebSocket server is accepting
-    # connections, so this doubles as a readiness gate for clients.
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/json"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   postgres:
     image: postgres:18
     environment:

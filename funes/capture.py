@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 import fsspec
 from fsspec.implementations.asyn_wrapper import AsyncFileSystemWrapper
 from pravda import Pravda, PravdaConfig, Snapshot
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from funes.config import PravdaSettings
 
@@ -52,14 +53,15 @@ def inspectability_issue(snapshot: Snapshot) -> str | None:
     return reason
 
 
-def pravda_client(settings: PravdaSettings) -> Pravda:
-    """Construct a Pravda client from Funes's settings."""
+def pravda_client(
+    settings: PravdaSettings, sessionmaker: async_sessionmaker[AsyncSession]
+) -> Pravda:
+    """Construct a Pravda client from Funes's settings and session factory."""
     config = PravdaConfig(
-        database_url=settings.database_url,
         browser_ws_url=settings.browser_ws_url,
         storage_base_path=settings.storage_base_path,
     )
-    return Pravda(config)
+    return Pravda(config, sessionmaker)
 
 
 def artifact_filesystem(settings: PravdaSettings):

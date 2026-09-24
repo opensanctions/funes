@@ -42,7 +42,7 @@ def load_config() -> Config:
     """Load and validate all settings from the environment."""
     return Config(
         pravda=PravdaSettings(
-            database_url=os.environ["PRAVDA_DATABASE_URL"],
+            database_url=os.environ["DATABASE_URL"],
             browser_ws_url=os.environ["PRAVDA_BROWSER_WS_URL"],
             storage_base_path=os.environ["PRAVDA_STORAGE_BASE_PATH"],
         ),

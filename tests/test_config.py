@@ -7,7 +7,7 @@ import pytest
 from funes.config import load_config
 
 REQUIRED_VARS = {
-    "PRAVDA_DATABASE_URL": "postgresql+psycopg://test:test@localhost:5432/test",
+    "DATABASE_URL": "postgresql+psycopg://test:test@localhost:5432/test",
     "PRAVDA_BROWSER_WS_URL": "ws://localhost:3000",
     "PRAVDA_STORAGE_BASE_PATH": "memory://storage",
     "INPUT_BASE_PATH": "./datasets",

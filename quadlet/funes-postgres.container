@@ -1,6 +1,6 @@
 # Funes/Pravda PostgreSQL 18, published on localhost:5432.
 #
-# Credentials and database name match the PRAVDA_DATABASE_URL default in
+# Credentials and database name match the DATABASE_URL default in
 # .env.example: pravda:pravda@localhost:5432/pravda.
 #
 # Data lives in the named podman volume `funes-postgres-data`, which survives

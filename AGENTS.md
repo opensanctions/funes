@@ -1,6 +1,6 @@
 # Funes
 
-Funes turns web pages into inspection-brief-scoped people/position facts. It embeds [Pravda](https://github.com/opensanctions/pravda) (PyPI: `opensanctions-pravda`) as an in-process async library for page capture and storage, and queues candidate-inspection jobs through Procrastinate. Funes owns the infrastructure Pravda connects to: a headed Chrome browser, an async Postgres database, and an fsspec artifact store (see `.env.example`).
+Funes turns web pages into inspection-brief-scoped people/position facts. It embeds [Pravda](https://github.com/opensanctions/pravda) (PyPI: `opensanctions-pravda`) as an in-process async library for page capture and storage, and queues candidate-inspection jobs through Procrastinate. Funes owns the infrastructure Pravda connects to: an async Postgres database and an fsspec artifact store; the browser is any Playwright Chromium WebSocket endpoint (see `.env.example`).
 
 ## Project philosophy
 
@@ -11,7 +11,7 @@ Funes turns web pages into inspection-brief-scoped people/position facts. It emb
 
 ```bash
 uv sync                  # install dependencies
-docker compose up -d     # shared dev infrastructure: Postgres + headed Chrome
+docker compose up -d     # shared dev infrastructure: Postgres (the browser is external)
 uv run --env-file .env funes migrate      # apply Pravda and Funes schemas, bootstrap candidates from YAML
 uv run --env-file .env funes enqueue      # queue one job per due candidate
 uv run --env-file .env procrastinate worker --queues inspect  # capture/extract only; discovery and repair jobs stay pending
