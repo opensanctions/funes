@@ -425,7 +425,7 @@ async def store_discovered_candidates(
 
 
 async def select_due_candidates(
-    session: AsyncSession, revisit_interval: timedelta
+    session: AsyncSession, revisit_interval: timedelta, dataset: str | None = None
 ) -> list[Candidate]:
     """Return candidates due for a new run, in deterministic order.
 
@@ -433,7 +433,8 @@ async def select_due_candidates(
     created_at, ties broken by id) carries a HIT inspection and is older
     than ``revisit_interval``. A latest MISS inspection or BROKEN
     assessment blocks the normal queue; broken snapshots are the repair
-    path's business, not this one.
+    path's business, not this one. ``dataset`` optionally restricts the
+    selection to one input dataset by name.
     """
     # Deterministic latest attempt per candidate: newest created_at wins,
     # ties broken by the greater id.
@@ -477,6 +478,8 @@ async def select_due_candidates(
         )
         .order_by(Dataset.name, Subject.name, Url.url)
     )
+    if dataset is not None:
+        stmt = stmt.where(Dataset.name == dataset)
     result = await session.execute(stmt)
     return list(result.scalars().all())
 

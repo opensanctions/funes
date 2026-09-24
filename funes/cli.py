@@ -6,6 +6,7 @@ import logging
 import click
 from pravda import migrate as pravda_migrate
 from procrastinate.exceptions import AlreadyEnqueued
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from funes import db
@@ -63,7 +64,13 @@ def migrate_cmd() -> None:
         "broken snapshots are the repair queue's business."
     )
 )
-def enqueue_cmd() -> None:
+@click.option(
+    "--dataset",
+    default=None,
+    metavar="NAME",
+    help="Queue only candidates of this input dataset (e.g. au_judges).",
+)
+def enqueue_cmd(dataset: str | None) -> None:
     config = load_config()
 
     async def enqueue() -> None:
@@ -71,8 +78,12 @@ def enqueue_cmd() -> None:
         engine = create_async_engine(config.pravda.database_url)
         try:
             async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+                if dataset is not None and not await session.scalar(
+                    select(db.Dataset.id).where(db.Dataset.name == dataset)
+                ):
+                    raise click.UsageError(f"unknown dataset: {dataset!r}")
                 candidates = await db.select_due_candidates(
-                    session, config.revisit_interval
+                    session, config.revisit_interval, dataset=dataset
                 )
         finally:
             await engine.dispose()

@@ -560,6 +560,39 @@ def test_select_due_candidates_recent_result_supersedes_older_hit():
     assert run() == []
 
 
+def test_select_due_candidates_filters_by_dataset():
+    def run() -> list[str]:
+        async def scenario(session: AsyncSession) -> list[str]:
+            await import_catalogue(
+                session,
+                [
+                    make_definition(
+                        "two",
+                        "Judges",
+                        "Court",
+                        {"Example Court": ["https://d.example"]},
+                    ),
+                    make_definition(
+                        "one",
+                        "Board members",
+                        "Organization",
+                        {"Example Foundation": ["https://c.example"]},
+                    ),
+                ],
+            )
+            await session.commit()
+            return [
+                c.url.url
+                for c in await select_due_candidates(
+                    session, timedelta(days=7), dataset="two"
+                )
+            ]
+
+        return asyncio.run(run_with_session(scenario))
+
+    assert run() == ["https://d.example"]
+
+
 def test_select_due_candidates_orders_deterministically():
     def run() -> list[str]:
         async def scenario(session: AsyncSession) -> list[str]:
