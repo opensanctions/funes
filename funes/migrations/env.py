@@ -41,12 +41,12 @@ def run_migrations(connection: Connection) -> None:
 
 async def run_online() -> None:
     database_url = config.get_main_option("sqlalchemy.url") or os.environ.get(
-        "DATABASE_URL"
+        "FUNES_DATABASE_URI"
     )
     if not database_url:
         raise RuntimeError(
             "No database URL configured: set sqlalchemy.url in the Alembic "
-            "configuration or DATABASE_URL in the environment."
+            "configuration or FUNES_DATABASE_URI in the environment."
         )
     engine = create_async_engine(database_url, poolclass=pool.NullPool)
     try:

@@ -3,7 +3,7 @@
 # Chromium WebSocket endpoint, which is not a container here.
 #
 # With the defaults below, set in .env:
-#   DATABASE_URL=postgresql+psycopg://pravda:pravda@localhost:5432/pravda
+#   FUNES_DATABASE_URI=postgresql+psycopg://pravda:pravda@localhost:5432/pravda
 #   PRAVDA_BROWSER_WS_URL=ws://127.0.0.1:9222
 #   PRAVDA_STORAGE_BASE_PATH=./storage
 services:
