@@ -12,7 +12,9 @@ Funes turns web pages into inspection-brief-scoped people/position facts. It emb
 ```bash
 uv sync                  # install dependencies
 docker compose up -d     # shared dev infrastructure: Postgres (the browser is external)
-uv run --env-file .env funes migrate      # apply Pravda and Funes schemas, bootstrap candidates from YAML
+uv run --env-file .env alembic -n pravda upgrade head   # apply Pravda's packaged schema
+uv run --env-file .env alembic -n funes upgrade head    # apply Funes's own schema
+uv run --env-file .env funes seed                       # append-only bootstrap of candidates from YAML
 uv run --env-file .env funes enqueue      # queue one job per due candidate
 uv run --env-file .env procrastinate worker --queues inspect  # capture/extract only; discovery and repair jobs stay pending
 uv run --env-file .env procrastinate worker --queues discovery  # dedicated discovery worker: discover_links runs per usable attempt
@@ -28,7 +30,7 @@ uv run --env-file .env pytest             # run the test suite
 ```
 funes/
   procrastinate.py  # module-level Procrastinate app (the PROCRASTINATE_APP target); worker config
-  cli.py        # migrate, enqueue commands
+  cli.py        # seed, enqueue commands
   tasks.py      # Procrastinate tasks: inspect_candidate pipeline; discover_links on the discovery queue; dormant repair_snapshot
   capture.py    # Pravda client and fsspec artifact helpers
   extract.py    # pydantic-ai extraction agent, Hit/Miss/BrokenSnapshot schemas, prompts
@@ -36,7 +38,6 @@ funes/
   agents.py     # vocabulary shared by the LLM agents: trusted brief, strict output-schema bases
   outline.py    # compact model-facing outline from rendered HTML + HAR
   db.py         # SQLAlchemy models: Dataset/Subject/URL/Candidate/Attempt persistence
-  migrate.py    # Alembic runner; migrations/ holds Funes's ledger
   sources.py    # bootstrap YAML loading (dataset/subject/url catalogue)
   config.py     # typed configuration
   sessions.py   # agent session transcripts

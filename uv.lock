@@ -616,7 +616,7 @@ requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.15.0" },
     { name = "click", specifier = ">=8.4.1" },
     { name = "fsspec", extras = ["gcs"], specifier = ">=2026.6.0" },
-    { name = "opensanctions-pravda", specifier = ">=0.2.0" },
+    { name = "opensanctions-pravda", specifier = ">=0.3.0" },
     { name = "procrastinate", specifier = "==3.9.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
     { name = "pydantic-ai-slim", extras = ["openai"], specifier = ">=2.34,<3" },
@@ -1343,7 +1343,7 @@ wheels = [
 
 [[package]]
 name = "opensanctions-pravda"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1354,9 +1354,9 @@ dependencies = [
     { name = "psycopg", extra = ["binary"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3b/df/5f68baec5b1b74fd3f3b625405ca4edf9d5ec55a27ab3cfc306cc6711c55/opensanctions_pravda-0.2.0.tar.gz", hash = "sha256:e001494fd438a79b1e6076ba5c5051c7851fd81a8d8a4cf947c2fbb72c28e68f", size = 14069, upload-time = "2026-09-24T19:31:23.929Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/09/d3/983544166db7c014b57505d00ff8582694ef996cd6fc6175f5b08749af49/opensanctions_pravda-0.3.0.tar.gz", hash = "sha256:68a4e2a19371bda92ef29b0a45ee35b21f53a14eaf6249e46d5435b0b62ab4e3", size = 13992, upload-time = "2026-09-28T14:19:51.93Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c6/c4/70c88f984f5d892a2f3f3765c3821ef5bd5078a8298a32952d211e8cd7c9/opensanctions_pravda-0.2.0-py3-none-any.whl", hash = "sha256:a46c285190ecc6bbfc1241c6768b10f9a6f3576fe811213975b69ac7c09b9047", size = 18776, upload-time = "2026-09-24T19:31:22.667Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/57/e6d40c9ac5360c6ca05a3cbfe135d46fef7453ec2a21a5fce801d47360de/opensanctions_pravda-0.3.0-py3-none-any.whl", hash = "sha256:69380cf6aeb64444efe491264dae4c7271a47eadc03d2930ce039c88a5d05da6", size = 18462, upload-time = "2026-09-28T14:19:50.573Z" },
 ]
 
 [[package]]

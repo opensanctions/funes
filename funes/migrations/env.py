@@ -1,6 +1,7 @@
 """Online-only Alembic environment for Funes."""
 
 import asyncio
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -39,9 +40,14 @@ def run_migrations(connection: Connection) -> None:
 
 
 async def run_online() -> None:
-    database_url = config.get_main_option("sqlalchemy.url")
+    database_url = config.get_main_option("sqlalchemy.url") or os.environ.get(
+        "DATABASE_URL"
+    )
     if not database_url:
-        raise RuntimeError("No database URL configured")
+        raise RuntimeError(
+            "No database URL configured: set sqlalchemy.url in the Alembic "
+            "configuration or DATABASE_URL in the environment."
+        )
     engine = create_async_engine(database_url, poolclass=pool.NullPool)
     try:
         async with engine.connect() as connection:

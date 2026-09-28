@@ -4,14 +4,12 @@ import asyncio
 import logging
 
 import click
-from pravda import migrate as pravda_migrate
 from procrastinate.exceptions import AlreadyEnqueued
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from funes import db
 from funes.config import load_config
-from funes.migrate import migrate
 from funes.procrastinate import app
 from funes.sources import load_datasets
 from funes.tasks import inspect_candidate
@@ -26,18 +24,14 @@ def cli() -> None:
 
 @cli.command(
     help=(
-        "Apply Pravda's packaged migrations, then Funes's own, then "
-        "append-only import dataset/subject/URL candidate rows from the "
-        "input YAML datasets."
+        "Append-only import of dataset/subject/URL candidate rows from "
+        "the input YAML datasets."
     )
 )
-def migrate_cmd() -> None:
+def seed() -> None:
     config = load_config()
 
     async def run() -> None:
-        await pravda_migrate(config.pravda.database_url)
-        await migrate(config.pravda.database_url)
-
         definitions = load_datasets(config.input.base_path)
         log.info(
             "%d input dataset(s), %d subject(s)",
