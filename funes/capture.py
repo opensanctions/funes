@@ -4,10 +4,7 @@ from urllib.parse import urlparse
 
 import fsspec
 from fsspec.implementations.asyn_wrapper import AsyncFileSystemWrapper
-from pravda import Pravda, PravdaConfig, Snapshot
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
-from funes.config import PravdaSettings
+from pravda import Snapshot
 
 
 def first_error_line(error: str | None) -> str | None:
@@ -53,25 +50,14 @@ def inspectability_issue(snapshot: Snapshot) -> str | None:
     return reason
 
 
-def pravda_client(
-    settings: PravdaSettings, sessionmaker: async_sessionmaker[AsyncSession]
-) -> Pravda:
-    """Construct a Pravda client from Funes's settings and session factory."""
-    config = PravdaConfig(
-        browser_ws_url=settings.browser_ws_url,
-        storage_base_path=settings.storage_base_path,
-    )
-    return Pravda(config, sessionmaker)
-
-
-def artifact_filesystem(settings: PravdaSettings):
+def artifact_filesystem(storage_base_path: str):
     """Return the async fsspec backend shared with Pravda.
 
     Synchronous backends are wrapped so all artifact reads stay on the current
     event loop. Using fsspec's sync bridge can move an async backend to its
     background loop after Pravda has bound the backend's session here.
     """
-    fs, _ = fsspec.core.url_to_fs(settings.storage_base_path)
+    fs, _ = fsspec.core.url_to_fs(storage_base_path)
     if not fs.async_impl:
         fs = AsyncFileSystemWrapper(fs)
     return fs

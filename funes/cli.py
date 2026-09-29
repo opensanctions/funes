@@ -32,13 +32,13 @@ def seed() -> None:
     config = load_config()
 
     async def run() -> None:
-        definitions = load_datasets(config.input.base_path)
+        definitions = load_datasets(config.input_base_path)
         log.info(
             "%d input dataset(s), %d subject(s)",
             len(definitions),
             sum(len(definition.subjects) for definition in definitions),
         )
-        engine = create_async_engine(config.pravda.database_url)
+        engine = create_async_engine(config.database_url)
         try:
             async with async_sessionmaker(engine)() as session:
                 await db.import_catalogue(session, definitions)
@@ -69,7 +69,7 @@ def enqueue_cmd(dataset: str | None) -> None:
 
     async def enqueue() -> None:
         """Select due candidates and queue one job per candidate."""
-        engine = create_async_engine(config.pravda.database_url)
+        engine = create_async_engine(config.database_url)
         try:
             async with async_sessionmaker(engine, expire_on_commit=False)() as session:
                 if dataset is not None and not await session.scalar(

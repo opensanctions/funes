@@ -42,7 +42,7 @@ def main() -> int:
         help="run only this case; may be supplied more than once",
     )
     args = parser.parse_args()
-    model = args.model or load_config().model.name
+    model = args.model or load_config().model
 
     dataset = Dataset[FixtureInput, Discovery, NoneType].from_file(
         args.dataset, custom_evaluator_types=CUSTOM_EVALUATOR_TYPES

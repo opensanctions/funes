@@ -5,6 +5,7 @@ import uuid
 from enum import StrEnum
 from functools import partial
 
+from pravda import Pravda
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import selectinload
@@ -15,7 +16,6 @@ from funes.capture import (
     artifact_filesystem,
     first_error_line,
     inspectability_issue,
-    pravda_client,
     read_artifact,
 )
 from funes.discovery import discovery_agent, page_link_urls
@@ -72,9 +72,9 @@ async def discover_links(attempt_id: str) -> None:
     page snapshot prompt the extraction agent judged.
     Broken attempts have no inspection and are never routed here.
     """
-    model = config.model.name
+    model = config.model
 
-    engine = create_async_engine(config.pravda.database_url)
+    engine = create_async_engine(config.database_url)
     try:
         sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
         async with sessionmaker() as session:
@@ -108,7 +108,7 @@ async def discover_links(attempt_id: str) -> None:
             # expire_on_commit=False keeps the loaded attributes alive.
             await session.commit()
 
-            pravda = pravda_client(config.pravda, sessionmaker)
+            pravda = Pravda(config.pravda, sessionmaker)
             snapshots = await pravda.snapshots(url)
             snapshot = next(
                 (
@@ -126,7 +126,7 @@ async def discover_links(attempt_id: str) -> None:
                     f"usable attempt {attempt_id} has uninspectable snapshot: {issue}"
                 )
 
-            fs = artifact_filesystem(config.pravda)
+            fs = artifact_filesystem(config.pravda.storage_base_path)
             html = (await read_artifact(fs, snapshot.rendered_html)).decode("utf-8")
             urls = page_link_urls(snapshot.final_url, html)
             if not urls:
@@ -149,7 +149,7 @@ async def discover_links(attempt_id: str) -> None:
                 deps=brief,
             )
             write_session(
-                session_path(config.sessions.base_path, "discovery", attempt_id),
+                session_path(config.sessions_base_path, "discovery", attempt_id),
                 run.all_messages_json(),
             )
             dropped = [
@@ -195,10 +195,10 @@ async def inspect_candidate(candidate_id: str) -> None:
     # The model comes from worker configuration, never from the queue
     # payload; the attempt UUID is generated here and identifies the run:
     # Pydantic run_id, transcript basename, DB Attempt.id, repair routing.
-    model = config.model.name
+    model = config.model
     attempt_id = uuid.uuid4()
 
-    engine = create_async_engine(config.pravda.database_url)
+    engine = create_async_engine(config.database_url)
     try:
         sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
         async with sessionmaker() as session:
@@ -220,8 +220,8 @@ async def inspect_candidate(candidate_id: str) -> None:
             # expire_on_commit=False keeps the loaded attributes alive.
             await session.commit()
 
-            fs = artifact_filesystem(config.pravda)
-            pravda = pravda_client(config.pravda, sessionmaker)
+            fs = artifact_filesystem(config.pravda.storage_base_path)
+            pravda = Pravda(config.pravda, sessionmaker)
             snapshot = await pravda.snapshot(url)
 
             issue = inspectability_issue(snapshot)
@@ -265,7 +265,7 @@ async def inspect_candidate(candidate_id: str) -> None:
                 deps=deps,
             )
             session_file = session_path(
-                config.sessions.base_path, "extraction", str(attempt_id)
+                config.sessions_base_path, "extraction", str(attempt_id)
             )
 
             if isinstance(run.output, BrokenSnapshot):

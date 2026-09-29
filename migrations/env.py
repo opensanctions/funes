@@ -36,9 +36,7 @@ def run_migrations(connection: Connection) -> None:
 
 
 async def run_online() -> None:
-    engine = create_async_engine(
-        load_config().pravda.database_url, poolclass=pool.NullPool
-    )
+    engine = create_async_engine(load_config().database_url, poolclass=pool.NullPool)
     try:
         async with engine.connect() as connection:
             await connection.run_sync(run_migrations)

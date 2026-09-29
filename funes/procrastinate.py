@@ -15,7 +15,7 @@ from funes.config import load_config
 
 config = load_config()
 dsn = (
-    make_url(config.pravda.database_url)
+    make_url(config.database_url)
     .set(drivername="postgresql")
     .render_as_string(hide_password=False)
 )
