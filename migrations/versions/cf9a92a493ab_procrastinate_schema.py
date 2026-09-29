@@ -1,3 +1,25 @@
+"""procrastinate schema
+
+Revision ID: cf9a92a493ab
+Revises: a33238ea78b2
+Create Date: 2026-09-29 21:09:13.702805
+
+Procrastinate 3.9.0 ships no migration ledger; this is its schema.sql,
+inlined verbatim so the revision is self-contained and immutable.
+"""
+
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+from alembic import op
+
+# revision identifiers, used by Alembic.
+revision: str = "cf9a92a493ab"
+down_revision: str | Sequence[str] | None = "a33238ea78b2"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+SCHEMA_SQL = """
 -- Procrastinate Schema
 
 DO $$
@@ -597,3 +619,57 @@ CREATE TRIGGER procrastinate_trigger_abort_requested_events_v1
 CREATE TRIGGER procrastinate_trigger_delete_jobs_v1
     BEFORE DELETE ON procrastinate_jobs
     FOR EACH ROW EXECUTE PROCEDURE procrastinate_unlink_periodic_defers_v1();
+"""
+
+PROCRASTINATE_FUNCTIONS = (
+    "procrastinate_defer_jobs_v1",
+    "procrastinate_defer_periodic_job_v2",
+    "procrastinate_fetch_job_v2",
+    "procrastinate_finish_job_v1",
+    "procrastinate_cancel_job_v1",
+    "procrastinate_retry_job_v1",
+    "procrastinate_retry_job_v2",
+    "procrastinate_notify_queue_job_inserted_v1",
+    "procrastinate_notify_queue_abort_job_v1",
+    "procrastinate_trigger_function_status_events_insert_v1",
+    "procrastinate_trigger_function_status_events_update_v1",
+    "procrastinate_trigger_function_scheduled_events_v1",
+    "procrastinate_trigger_abort_requested_events_procedure_v1",
+    "procrastinate_unlink_periodic_defers_v1",
+    "procrastinate_register_worker_v1",
+    "procrastinate_unregister_worker_v1",
+    "procrastinate_update_heartbeat_v1",
+    "procrastinate_prune_stalled_workers_v1",
+)
+PROCRASTINATE_TABLES = (
+    "procrastinate_jobs",
+    "procrastinate_events",
+    "procrastinate_periodic_defers",
+    "procrastinate_workers",
+)
+PROCRASTINATE_TYPES = (
+    "procrastinate_job_status",
+    "procrastinate_job_event_type",
+    "procrastinate_job_to_defer_v1",
+)
+
+
+def upgrade() -> None:
+    # The parameterless multi-statement script (DO $$ blocks included) runs
+    # in one round trip; no_parameters stops psycopg from treating the
+    # script's % characters (plpgsql RAISE format strings) as placeholders.
+    op.get_bind().exec_driver_sql(SCHEMA_SQL, execution_options={"no_parameters": True})
+
+
+def downgrade() -> None:
+    # Functions are dropped explicitly first: plpgsql bodies referencing
+    # tables are not tracked dependencies, so dropping the tables with
+    # CASCADE removes indexes, triggers, and constraints but silently
+    # leaves the functions.
+    bind = op.get_bind()
+    for function in PROCRASTINATE_FUNCTIONS:
+        bind.execute(sa.text(f'DROP FUNCTION IF EXISTS "{function}" CASCADE'))
+    for table in PROCRASTINATE_TABLES:
+        bind.execute(sa.text(f'DROP TABLE IF EXISTS "{table}" CASCADE'))
+    for type_ in PROCRASTINATE_TYPES:
+        bind.execute(sa.text(f'DROP TYPE IF EXISTS "{type_}" CASCADE'))
